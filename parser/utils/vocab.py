@@ -31,15 +31,6 @@ class Vocab(object):
         self.n_rels = len(self.rels)
         self.n_train_words = self.n_words
 
-    def __repr__(self):
-        info = f"{self.__class__.__name__}(\n"
-        info += f"  num of words: {self.n_words}\n"
-        info += f"  num of tags: {self.n_tags}\n"
-        info += f"  num of rels: {self.n_rels}\n"
-        info += f")"
-
-        return info
-
     def word2id(self, sequence):
         return torch.tensor([self.word_dict.get(word.lower(), self.unk_index)
                              for word in sequence])

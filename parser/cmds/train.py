@@ -41,7 +41,10 @@ class Train(object):
             vocab = Vocab.from_corpus(corpus=train, min_freq=2)
             vocab.read_embeddings(embed=Embedding.load(args.fembed))
             torch.save(vocab, args.vocab)
-        print(vocab)
+        print(f"Vocab: "
+              f"{vocab.n_words} words, "
+              f"{vocab.n_tags} tags, "
+              f"{vocab.n_rels} rels")
 
         print("Load the dataset")
         trainset = TextDataset(vocab.numericalize(train))
