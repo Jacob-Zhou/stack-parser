@@ -1,0 +1,15 @@
+# ignore data files
+data
+
+# ignore results
+results
+
+# ignore pycache
+__pycache__
+
+# ignore saved model
+*.pkl
+*.pt
+
+# ignore vscode
+.vscode
