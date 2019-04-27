@@ -18,13 +18,13 @@ class Train(object):
         )
         subparser.add_argument('--buckets', default=64, type=int,
                                help='max num of buckets to use')
-        subparser.add_argument('--ftrain', default='data/ptb/train.conllx',
+        subparser.add_argument('--ftrain', default='data/train.auto.conllx',
                                help='path to train file')
-        subparser.add_argument('--fdev', default='data/ptb/dev.conllx',
+        subparser.add_argument('--fdev', default='data/dev.auto.conllx',
                                help='path to dev file')
-        subparser.add_argument('--ftest', default='data/ptb/test.conllx',
+        subparser.add_argument('--ftest', default='data/test.auto.conllx',
                                help='path to test file')
-        subparser.add_argument('--fembed', default='data/glove.6B.100d.txt',
+        subparser.add_argument('--fembed', default='data/giga.100.txt',
                                help='path to pretrained embedding file')
         subparser.set_defaults(func=self)
 

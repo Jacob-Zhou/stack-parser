@@ -25,9 +25,9 @@ if __name__ == '__main__':
                                help='seed for generating random numbers')
         subparser.add_argument('--threads', '-t', default=4, type=int,
                                help='max num of threads')
-        subparser.add_argument('--file', '-f', default='exp/tag/model',
+        subparser.add_argument('--file', '-f', default='exp/model',
                                help='path to model file')
-        subparser.add_argument('--vocab', '-v', default='exp/tag/vocab',
+        subparser.add_argument('--vocab', '-v', default='exp/vocab',
                                help='path to vocabulary file')
     args = parser.parse_args()
 
