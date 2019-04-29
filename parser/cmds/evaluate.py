@@ -19,7 +19,7 @@ class Evaluate(object):
                                help='max num of buckets to use')
         subparser.add_argument('--include-punct', action='store_true',
                                help='whether to include punctuation')
-        subparser.add_argument('--fdata', default='data/ptb/test.conllx',
+        subparser.add_argument('--fdata', default='data/test.gold.conllx',
                                help='path to dataset')
         subparser.set_defaults(func=self)
 
@@ -38,5 +38,5 @@ class Evaluate(object):
         loader = batchify(dataset, args.batch_size, args.buckets)
 
         print("Evaluate the dataset")
-        loss, metric = model.evaluate(loader, include_punct=args.include_punct)
-        print(f"Loss: {loss:.4f} {metric}")
+        loss, metric_t, metric_p = model.evaluate(loader, args.include_punct)
+        print(f"Loss: {loss:.4f} {metric_t}, {metric_p}")

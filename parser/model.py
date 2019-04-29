@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from datetime import datetime, timedelta
-from parser.metric import AttachmentMethod
+from parser.metrics import AccuracyMethod, AttachmentMethod
 from parser.parser import BiaffineParser
 
 import torch
@@ -34,17 +34,17 @@ class Model(object):
             self.train(train_loader)
 
             print(f"Epoch {epoch} / {epochs}:")
-            loss, train_metric = self.evaluate(train_loader)
-            print(f"{'train:':6} Loss: {loss:.4f} {train_metric}")
-            loss, dev_metric = self.evaluate(dev_loader)
-            print(f"{'dev:':6} Loss: {loss:.4f} {dev_metric}")
-            loss, test_metric = self.evaluate(test_loader)
-            print(f"{'test:':6} Loss: {loss:.4f} {test_metric}")
+            loss, metric_t, metric_p = self.evaluate(train_loader)
+            print(f"{'train:':6} Loss: {loss:.4f} {metric_t} {metric_p}")
+            loss, metric_t, dev_metric_p = self.evaluate(dev_loader)
+            print(f"{'dev:':6} Loss: {loss:.4f} {metric_t} {dev_metric_p}")
+            loss, metric_t, metric_p = self.evaluate(test_loader)
+            print(f"{'test:':6} Loss: {loss:.4f} {metric_t} {metric_p}")
 
             t = datetime.now() - start
             # save the model if it is the best so far
-            if dev_metric > best_metric and epoch > patience:
-                best_e, best_metric = epoch, dev_metric
+            if dev_metric_p > best_metric and epoch > patience:
+                best_e, best_metric = epoch, dev_metric_p
                 self.network.save(file + f".{best_e}")
                 print(f"{t}s elapsed (saved)\n")
             else:
@@ -53,10 +53,10 @@ class Model(object):
             if epoch - best_e >= patience:
                 break
         self.network = BiaffineParser.load(file + f".{best_e}")
-        loss, metric = self.evaluate(test_loader)
+        loss, metric_t, metric_p = self.evaluate(test_loader)
 
         print(f"max score of dev is {best_metric.score:.2%} at epoch {best_e}")
-        print(f"the score of test at epoch {best_e} is {metric.score:.2%}")
+        print(f"the score of test at epoch {best_e} is {metric_p.score:.2%}")
         print(f"mean time of each epoch is {total_time / epoch}s")
         print(f"{total_time}s elapsed")
 
@@ -82,31 +82,28 @@ class Model(object):
             self.scheduler.step()
 
     @torch.no_grad()
-    def evaluate(self, loader, include_punct=False):
+    def evaluate(self, loader):
         self.network.eval()
 
-        loss, metric = 0, AttachmentMethod()
+        loss, metric_t, metric_p = 0, AccuracyMethod(), AttachmentMethod()
 
         for words, tags, arcs, rels in loader:
             mask = words.ne(self.vocab.pad_index)
             # ignore the first token of each sentence
             mask[:, 0] = 0
-            # ignore all punctuation if not specified
-            if not include_punct:
-                puncts = words.new_tensor(self.vocab.puncts)
-                mask &= words.unsqueeze(-1).ne(puncts).all(-1)
             s_tag, s_arc, s_rel = self.network(words)
             s_tag, s_arc, s_rel = s_tag[mask], s_arc[mask], s_rel[mask]
-            gold_tags = tags[mask]
+            gold_tags, pred_tags = tags[mask], s_tag.argmax(dim=-1)
             gold_arcs, gold_rels = arcs[mask], rels[mask]
             pred_arcs, pred_rels = self.decode(s_arc, s_rel)
 
             loss += self.get_loss(s_tag, s_arc, s_rel,
                                   gold_tags, gold_arcs, gold_rels)
-            metric(pred_arcs, pred_rels, gold_arcs, gold_rels)
+            metric_t(pred_tags, gold_tags)
+            metric_p(pred_arcs, pred_rels, gold_arcs, gold_rels)
         loss /= len(loader)
 
-        return loss, metric
+        return loss, metric_t, metric_p
 
     @torch.no_grad()
     def predict(self, loader):

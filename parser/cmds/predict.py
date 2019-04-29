@@ -15,7 +15,7 @@ class Predict(object):
         )
         subparser.add_argument('--batch-size', default=5000, type=int,
                                help='batch size')
-        subparser.add_argument('--fdata', default='data/ptb/test.conllx',
+        subparser.add_argument('--fdata', default='data/test.gold.conllx',
                                help='path to dataset')
         subparser.add_argument('--fpred', default='pred.conllx',
                                help='path to predicted result')

@@ -20,15 +20,14 @@ class BiaffineParser(nn.Module):
                                   embedding_dim=params['n_embed'])
         self.embed_dropout = IndependentDropout(p=params['embed_dropout'])
 
-        self.sl_dropout = nn.Dropout()
-        self.sl_lstm = nn.LSTM(input_size=params['n_embed'],
-                               hidden_size=150,
-                               batch_first=True,
-                               bidirectional=True)
-        self.sl_mlp = MLP(n_in=300, n_hidden=params['n_tags'])
+        self.tag_dropout = nn.Dropout()
+        self.tag_lstm = BiLSTM(input_size=params['n_embed'],
+                               hidden_size=150)
+        self.mlp_tag = MLP(n_in=300, n_hidden=100)
+        self.ffn_tag = MLP(n_in=100, n_hidden=params['n_tags'])
 
         # the word-lstm layer
-        self.lstm = BiLSTM(input_size=params['n_embed']+300,
+        self.lstm = BiLSTM(input_size=params['n_embed']+100,
                            hidden_size=params['n_lstm_hidden'],
                            num_layers=params['n_lstm_layers'],
                            dropout=params['lstm_dropout'])
@@ -78,16 +77,16 @@ class BiaffineParser(nn.Module):
         sorted_lens, indices = torch.sort(lens, descending=True)
         inverse_indices = indices.argsort()
 
-        sl_x = self.sl_dropout(embed)
-        sl_x = pack_padded_sequence(sl_x[indices], sorted_lens, True)
-        sl_x, _ = self.sl_lstm(sl_x)
-        sl_x, _ = pad_packed_sequence(sl_x, True)
-        sl_x = sl_x[inverse_indices]
-        s_tag = self.sl_mlp(sl_x)
+        x_tag = self.tag_dropout(embed)
+        x_tag = pack_padded_sequence(x_tag[indices], sorted_lens, True)
+        x_tag = self.tag_lstm(x_tag)
+        x_tag, _ = pad_packed_sequence(x_tag, True)
+        x_tag = x_tag[inverse_indices]
+        s_tag = self.mlp_tag(x_tag)
 
-        embed, sl_embed = self.embed_dropout(embed, sl_x)
+        embed, tag_embed = self.embed_dropout(embed, s_tag)
         # concatenate the word and tag representations
-        x = torch.cat((embed, sl_embed), dim=-1)
+        x = torch.cat((embed, tag_embed), dim=-1)
 
         x = pack_padded_sequence(x[indices], sorted_lens, True)
         x = self.lstm(x)
@@ -100,6 +99,7 @@ class BiaffineParser(nn.Module):
         rel_h = self.mlp_rel_h(x)
         rel_d = self.mlp_rel_d(x)
 
+        s_tag = self.ffn_tag(s_tag)
         # get arc and rel scores from the bilinear attention
         # [batch_size, seq_len, seq_len]
         s_arc = self.arc_attn(arc_d, arc_h)

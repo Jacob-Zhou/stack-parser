@@ -18,11 +18,11 @@ class Train(object):
         )
         subparser.add_argument('--buckets', default=64, type=int,
                                help='max num of buckets to use')
-        subparser.add_argument('--ftrain', default='data/train.auto.conllx',
+        subparser.add_argument('--ftrain', default='data/train.gold.conllx',
                                help='path to train file')
-        subparser.add_argument('--fdev', default='data/dev.auto.conllx',
+        subparser.add_argument('--fdev', default='data/dev.gold.conllx',
                                help='path to dev file')
-        subparser.add_argument('--ftest', default='data/test.auto.conllx',
+        subparser.add_argument('--ftest', default='data/test.gold.conllx',
                                help='path to test file')
         subparser.add_argument('--fembed', default='data/giga.100.txt',
                                help='path to pretrained embedding file')
@@ -41,10 +41,7 @@ class Train(object):
             vocab = Vocab.from_corpus(corpus=train, min_freq=2)
             vocab.read_embeddings(embed=Embedding.load(args.fembed))
             torch.save(vocab, args.vocab)
-        print(f"Vocab: "
-              f"{vocab.n_words} words, "
-              f"{vocab.n_tags} tags, "
-              f"{vocab.n_rels} rels")
+        print(vocab)
 
         print("Load the dataset")
         trainset = TextDataset(vocab.numericalize(train))
