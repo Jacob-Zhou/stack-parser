@@ -17,26 +17,23 @@ class Evaluate(object):
                                help='batch size')
         subparser.add_argument('--buckets', default=64, type=int,
                                help='max num of buckets to use')
-        subparser.add_argument('--include-punct', action='store_true',
-                               help='whether to include punctuation')
         subparser.add_argument('--fdata', default='data/test.gold.conllx',
                                help='path to dataset')
-        subparser.set_defaults(func=self)
 
         return subparser
 
-    def __call__(self, args):
+    def __call__(self, config):
         print("Load the model")
-        vocab = torch.load(args.vocab)
-        network = BiaffineParser.load(args.file)
+        vocab = torch.load(config.vocab)
+        network = BiaffineParser.load(config.file)
         model = Model(vocab, network)
 
         print("Load the dataset")
-        corpus = Corpus.load(args.fdata)
-        dataset = TextDataset(vocab.numericalize(corpus), args.buckets)
+        corpus = Corpus.load(config.fdata)
+        dataset = TextDataset(vocab.numericalize(corpus))
         # set the data loader
-        loader = batchify(dataset, args.batch_size, args.buckets)
+        loader = batchify(dataset, config.batch_size, config.buckets)
 
         print("Evaluate the dataset")
-        loss, metric_t, metric_p = model.evaluate(loader, args.include_punct)
+        loss, metric_t, metric_p = model.evaluate(loader)
         print(f"Loss: {loss:.4f} {metric_t}, {metric_p}")

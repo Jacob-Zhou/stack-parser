@@ -36,8 +36,8 @@ class Model(object):
             print(f"Epoch {epoch} / {epochs}:")
             loss, metric_t, metric_p = self.evaluate(train_loader)
             print(f"{'train:':6} Loss: {loss:.4f} {metric_t} {metric_p}")
-            loss, metric_t, dev_metric_p = self.evaluate(dev_loader)
-            print(f"{'dev:':6} Loss: {loss:.4f} {metric_t} {dev_metric_p}")
+            loss, dev_metric_t, dev_metric_p = self.evaluate(dev_loader)
+            print(f"{'dev:':6} Loss: {loss:.4f} {dev_metric_t} {dev_metric_p}")
             loss, metric_t, metric_p = self.evaluate(test_loader)
             print(f"{'test:':6} Loss: {loss:.4f} {metric_t} {metric_p}")
 
@@ -63,13 +63,13 @@ class Model(object):
     def train(self, loader):
         self.network.train()
 
-        for words, tags, arcs, rels in loader:
+        for words, chars, tags, arcs, rels in loader:
             self.optimizer.zero_grad()
 
             mask = words.ne(self.vocab.pad_index)
             # ignore the first token of each sentence
             mask[:, 0] = 0
-            s_tag, s_arc, s_rel = self.network(words)
+            s_tag, s_arc, s_rel = self.network(words, chars)
             s_tag, s_arc, s_rel = s_tag[mask], s_arc[mask], s_rel[mask]
             gold_tags = tags[mask]
             gold_arcs, gold_rels = arcs[mask], rels[mask]
@@ -87,11 +87,11 @@ class Model(object):
 
         loss, metric_t, metric_p = 0, AccuracyMethod(), AttachmentMethod()
 
-        for words, tags, arcs, rels in loader:
+        for words, chars, tags, arcs, rels in loader:
             mask = words.ne(self.vocab.pad_index)
             # ignore the first token of each sentence
             mask[:, 0] = 0
-            s_tag, s_arc, s_rel = self.network(words)
+            s_tag, s_arc, s_rel = self.network(words, chars)
             s_tag, s_arc, s_rel = s_tag[mask], s_arc[mask], s_rel[mask]
             gold_tags, pred_tags = tags[mask], s_tag.argmax(dim=-1)
             gold_arcs, gold_rels = arcs[mask], rels[mask]
@@ -110,12 +110,12 @@ class Model(object):
         self.network.eval()
 
         all_arcs, all_rels = [], []
-        for words, tags in loader:
+        for words, chars in loader:
             mask = words.ne(self.vocab.pad_index)
             # ignore the first token of each sentence
             mask[:, 0] = 0
             lens = mask.sum(dim=1).tolist()
-            s_tag, s_arc, s_rel = self.network(words)
+            s_tag, s_arc, s_rel = self.network(words, chars)
             s_tag, s_arc, s_rel = s_tag[mask], s_arc[mask], s_rel[mask]
             pred_arcs, pred_rels = self.decode(s_arc, s_rel)
 

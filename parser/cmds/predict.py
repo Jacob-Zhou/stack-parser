@@ -19,24 +19,23 @@ class Predict(object):
                                help='path to dataset')
         subparser.add_argument('--fpred', default='pred.conllx',
                                help='path to predicted result')
-        subparser.set_defaults(func=self)
 
         return subparser
 
-    def __call__(self, args):
+    def __call__(self, config):
         print("Load the model")
-        vocab = torch.load(args.vocab)
-        network = BiaffineParser.load(args.file)
+        vocab = torch.load(config.vocab)
+        network = BiaffineParser.load(config.file)
         model = Model(vocab, network)
 
         print("Load the dataset")
-        corpus = Corpus.load(args.fdata)
+        corpus = Corpus.load(config.fdata)
         dataset = TextDataset(vocab.numericalize(corpus, False))
         # set the data loader
-        loader = batchify(dataset, args.batch_size)
+        loader = batchify(dataset, config.batch_size)
 
         print("Predict the dataset")
         corpus.heads, corpus.rels = model.predict(loader)
 
         print(f"Save the predicted result")
-        corpus.save(args.fpred)
+        corpus.save(config.fpred)
