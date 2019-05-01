@@ -83,5 +83,5 @@ class Train(object):
               lr=config.lr,
               betas=(config.beta_1, config.beta_2),
               epsilon=config.epsilon,
-              annealing=lambda x: config.decay ** (x / config.decay_steps),
+              annealing=lambda x: config.decay ** (x / config.steps),
               file=config.file)

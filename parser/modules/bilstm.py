@@ -46,8 +46,8 @@ class BiLSTM(nn.Module):
             hid_mask = SharedDropout.get_mask(h, self.dropout)
 
         for t in steps:
-            batch_size = batch_sizes[t]
-            if len(h) < batch_size:
+            last_batch_size, batch_size = len(h), batch_sizes[t]
+            if last_batch_size < batch_size:
                 h = torch.cat((h, init_h[last_batch_size:batch_size]))
                 c = torch.cat((c, init_c[last_batch_size:batch_size]))
             else:
@@ -57,7 +57,6 @@ class BiLSTM(nn.Module):
             output.append(h)
             if self.training:
                 h = h * hid_mask[:batch_size]
-            last_batch_size = batch_size
         if reverse:
             output.reverse()
         output = torch.cat(output)
@@ -72,7 +71,6 @@ class BiLSTM(nn.Module):
             init = x.new_zeros(batch_size, self.hidden_size)
             hx = (init, init)
 
-        outputs = []
         for layer in range(self.num_layers):
             if self.training:
                 mask = SharedDropout.get_mask(x[:batch_size], self.dropout)
@@ -91,6 +89,6 @@ class BiLSTM(nn.Module):
                                           batch_sizes=batch_sizes,
                                           reverse=True)
             x = torch.cat([f_output, b_output], -1)
-            outputs.append(PackedSequence(x, batch_sizes))
+        x = PackedSequence(x, batch_sizes)
 
-        return outputs
+        return x
