@@ -3,7 +3,7 @@
 import os
 from datetime import datetime, timedelta
 from parser import BiaffineParser, Model
-from parser.metric import Metric
+from parser.metric import AttachmentMethod
 from parser.utils import Corpus, Embedding, Vocab
 from parser.utils.data import TextDataset, batchify
 
@@ -83,7 +83,7 @@ class Train(object):
         model = Model(vocab, parser)
 
         total_time = timedelta()
-        best_e, best_metric = 1, Metric()
+        best_e, best_metric = 1, AttachmentMethod()
         model.optimizer = Adam(model.parser.parameters(),
                                config.lr,
                                (config.beta_1, config.beta_2),
@@ -97,11 +97,11 @@ class Train(object):
             model.train(train_loader)
 
             print(f"Epoch {epoch} / {config.epochs}:")
-            loss, metric_t, metric_p = self.evaluate(train_loader)
+            loss, metric_t, metric_p = model.evaluate(train_loader)
             print(f"{'train:':6} Loss: {loss:.4f} {metric_t} {metric_p}")
-            loss, dev_metric_t, dev_metric_p = self.evaluate(dev_loader)
+            loss, dev_metric_t, dev_metric_p = model.evaluate(dev_loader)
             print(f"{'dev:':6} Loss: {loss:.4f} {dev_metric_t} {dev_metric_p}")
-            loss, metric_t, metric_p = self.evaluate(test_loader)
+            loss, metric_t, metric_p = model.evaluate(test_loader)
             print(f"{'test:':6} Loss: {loss:.4f} {metric_t} {metric_p}")
 
             t = datetime.now() - start
@@ -116,7 +116,7 @@ class Train(object):
             if epoch - best_e >= config.patience:
                 break
         model.parser = BiaffineParser.load(config.model + f".{best_e}")
-        loss, metric_t, metric_p = self.evaluate(test_loader)
+        loss, metric_t, metric_p = model.evaluate(test_loader)
 
         print(f"max score of dev is {best_metric.score:.2%} at epoch {best_e}")
         print(f"the score of test at epoch {best_e} is {metric_p.score:.2%}")
