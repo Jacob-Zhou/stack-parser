@@ -18,48 +18,6 @@ class Model(object):
         self.parser = parser
         self.criterion = nn.CrossEntropyLoss()
 
-    def __call__(self, loaders, epochs, patience,
-                 lr, betas, epsilon, annealing, file):
-        total_time = timedelta()
-        best_e, best_metric = 1, AttachmentMethod()
-        train_loader, dev_loader, test_loader = loaders
-        self.optimizer = optim.Adam(params=self.parser.parameters(),
-                                    lr=lr, betas=betas, eps=epsilon)
-        self.scheduler = optim.lr_scheduler.LambdaLR(optimizer=self.optimizer,
-                                                     lr_lambda=annealing)
-
-        for epoch in range(1, epochs + 1):
-            start = datetime.now()
-            # train one epoch and update the parameters
-            self.train(train_loader)
-
-            print(f"Epoch {epoch} / {epochs}:")
-            loss, metric_t, metric_p = self.evaluate(train_loader)
-            print(f"{'train:':6} Loss: {loss:.4f} {metric_t} {metric_p}")
-            loss, dev_metric_t, dev_metric_p = self.evaluate(dev_loader)
-            print(f"{'dev:':6} Loss: {loss:.4f} {dev_metric_t} {dev_metric_p}")
-            loss, metric_t, metric_p = self.evaluate(test_loader)
-            print(f"{'test:':6} Loss: {loss:.4f} {metric_t} {metric_p}")
-
-            t = datetime.now() - start
-            # save the model if it is the best so far
-            if dev_metric_p > best_metric and epoch > patience:
-                best_e, best_metric = epoch, dev_metric_p
-                self.parser.save(file + f".{best_e}")
-                print(f"{t}s elapsed (saved)\n")
-            else:
-                print(f"{t}s elapsed\n")
-            total_time += t
-            if epoch - best_e >= patience:
-                break
-        self.parser = BiaffineParser.load(file + f".{best_e}")
-        loss, metric_t, metric_p = self.evaluate(test_loader)
-
-        print(f"max score of dev is {best_metric.score:.2%} at epoch {best_e}")
-        print(f"the score of test at epoch {best_e} is {metric_p.score:.2%}")
-        print(f"mean time of each epoch is {total_time / epoch}s")
-        print(f"{total_time}s elapsed")
-
     def train(self, loader):
         self.parser.train()
 

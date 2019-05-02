@@ -1,11 +1,15 @@
 # -*- coding: utf-8 -*-
 
 import os
+from datetime import datetime, timedelta
 from parser import BiaffineParser, Model
+from parser.metric import Metric
 from parser.utils import Corpus, Embedding, Vocab
 from parser.utils.data import TextDataset, batchify
 
 import torch
+from torch.optim import Adam
+from torch.optim.lr_scheduler import ExponentialLR
 
 
 class Train(object):
@@ -36,7 +40,7 @@ class Train(object):
             vocab = torch.load(config.vocab)
         else:
             vocab = Vocab.from_corpus(corpus=train, min_freq=2)
-            vocab.read_embeddings(embed=Embedding.load(config.fembed))
+            vocab.read_embeddings(Embedding.load(config.fembed))
             torch.save(vocab, config.vocab)
         config.update({
             'n_words': vocab.n_train_words,
@@ -77,11 +81,44 @@ class Train(object):
         print(f"{parser}\n")
 
         model = Model(vocab, parser)
-        model(loaders=(train_loader, dev_loader, test_loader),
-              epochs=config.epochs,
-              patience=config.patience,
-              lr=config.lr,
-              betas=(config.beta_1, config.beta_2),
-              epsilon=config.epsilon,
-              annealing=lambda x: config.decay ** (x / config.steps),
-              file=config.file)
+
+        total_time = timedelta()
+        best_e, best_metric = 1, Metric()
+        model.optimizer = Adam(model.parser.parameters(),
+                               config.lr,
+                               (config.beta_1, config.beta_2),
+                               config.epsilon)
+        model.scheduler = ExponentialLR(model.optimizer,
+                                        config.decay ** (1 / config.steps))
+
+        for epoch in range(1, config.epochs + 1):
+            start = datetime.now()
+            # train one epoch and update the parameters
+            model.train(train_loader)
+
+            print(f"Epoch {epoch} / {config.epochs}:")
+            loss, metric_t, metric_p = self.evaluate(train_loader)
+            print(f"{'train:':6} Loss: {loss:.4f} {metric_t} {metric_p}")
+            loss, dev_metric_t, dev_metric_p = self.evaluate(dev_loader)
+            print(f"{'dev:':6} Loss: {loss:.4f} {dev_metric_t} {dev_metric_p}")
+            loss, metric_t, metric_p = self.evaluate(test_loader)
+            print(f"{'test:':6} Loss: {loss:.4f} {metric_t} {metric_p}")
+
+            t = datetime.now() - start
+            # save the model if it is the best so far
+            if dev_metric_p > best_metric and epoch > config.patience:
+                best_e, best_metric = epoch, dev_metric_p
+                model.parser.save(config.model + f".{best_e}")
+                print(f"{t}s elapsed (saved)\n")
+            else:
+                print(f"{t}s elapsed\n")
+            total_time += t
+            if epoch - best_e >= config.patience:
+                break
+        model.parser = BiaffineParser.load(config.model + f".{best_e}")
+        loss, metric_t, metric_p = self.evaluate(test_loader)
+
+        print(f"max score of dev is {best_metric.score:.2%} at epoch {best_e}")
+        print(f"the score of test at epoch {best_e} is {metric_p.score:.2%}")
+        print(f"average time of each epoch is {total_time / epoch}s")
+        print(f"{total_time}s elapsed")

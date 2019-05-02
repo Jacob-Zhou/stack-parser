@@ -25,7 +25,7 @@ class Predict(object):
     def __call__(self, config):
         print("Load the model")
         vocab = torch.load(config.vocab)
-        parser = BiaffineParser.load(config.file)
+        parser = BiaffineParser.load(config.model)
         model = Model(vocab, parser)
 
         print("Load the dataset")
@@ -34,8 +34,8 @@ class Predict(object):
         # set the data loader
         loader = batchify(dataset, config.batch_size)
 
-        print("Predict the dataset")
+        print("Make predictions on the dataset")
         corpus.heads, corpus.rels = model.predict(loader)
 
-        print(f"Save the predicted result")
+        print(f"Save the predicted result to {config.fpred}")
         corpus.save(config.fpred)
