@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from parser.modules import (CHAR_LSTM, MLP, Biaffine, BiLSTM,
-                            IndependentDropout, SharedDropout)
+                            IndependentDropout, ScalarMix, SharedDropout)
 
 import torch
 import torch.nn as nn
@@ -30,6 +30,7 @@ class BiaffineParser(nn.Module):
                            hidden_size=config.n_lstm_hidden,
                            num_layers=config.n_lstm_layers,
                            dropout=config.lstm_dropout)
+        self.scalar_mix = ScalarMix(config.n_lstm_layers)
         self.lstm_dropout = SharedDropout(p=config.lstm_dropout)
 
         # the MLP layers
@@ -71,34 +72,33 @@ class BiaffineParser(nn.Module):
         # get the mask and lengths of given batch
         mask = words.ne(self.pad_index)
         lens = mask.sum(dim=1)
+        # set the indices larger than num_embeddings to unk_index
+        ext_mask = words.ge(self.embed.num_embeddings)
+        ext_words = words.masked_fill(ext_mask, self.unk_index)
+
         # get outputs from embedding layers
-        embed = self.pretrained(words)
-        embed += self.embed(
-            words.masked_fill_(words.ge(self.embed.num_embeddings),
-                               self.unk_index)
-        )
+        embed = self.pretrained(words) + self.embed(ext_words)
         char_embed = self.char_lstm(chars[mask])
         char_embed = pad_sequence(torch.split(char_embed, lens.tolist()), True)
         embed, char_embed = self.embed_dropout(embed, char_embed)
         # concatenate the word and char representations
-        x = torch.cat((embed, char_embed), dim=-1)
+        embed = torch.cat((embed, char_embed), dim=-1)
 
         sorted_lens, indices = torch.sort(lens, descending=True)
         inverse_indices = indices.argsort()
-        x = pack_padded_sequence(x[indices], sorted_lens, True)
-        x = self.lstm(x)
-        x_tag, _ = pad_packed_sequence(x[0], True)
-        x_tag = self.lstm_dropout(x_tag)[inverse_indices]
-        x, _ = pad_packed_sequence(x[-1], True)
-        x = self.lstm_dropout(x)[inverse_indices]
+        x = pack_padded_sequence(embed[indices], sorted_lens, True)
+        x = [pad_packed_sequence(i, True)[0] for i in self.lstm(x)]
+        x_tag = torch.stack(x)
+        x_tag = self.lstm_dropout(self.scalar_mix(x_tag))[inverse_indices]
+        x_dep = self.lstm_dropout(x[-1])[inverse_indices]
 
         # apply MLPs to the BiLSTM output states
-        s_tag = self.mlp_tag(x_tag)
-        arc_h = self.mlp_arc_h(x)
-        arc_d = self.mlp_arc_d(x)
-        rel_h = self.mlp_rel_h(x)
-        rel_d = self.mlp_rel_d(x)
+        arc_h = self.mlp_arc_h(x_dep)
+        arc_d = self.mlp_arc_d(x_dep)
+        rel_h = self.mlp_rel_h(x_dep)
+        rel_d = self.mlp_rel_d(x_dep)
 
+        s_tag = self.mlp_tag(x_tag)
         s_tag = self.ffn_tag(s_tag)
         # get arc and rel scores from the bilinear attention
         # [batch_size, seq_len, seq_len]
@@ -117,11 +117,11 @@ class BiaffineParser(nn.Module):
         else:
             device = torch.device('cpu')
         state = torch.load(fname, map_location=device)
-        network = cls(state['config'], state['embeddings'])
-        network.load_state_dict(state['state_dict'])
-        network.to(device)
+        parser = cls(state['config'], state['embeddings'])
+        parser.load_state_dict(state['state_dict'])
+        parser.to(device)
 
-        return network
+        return parser
 
     @classmethod
     def load_checkpoint(cls, fname):

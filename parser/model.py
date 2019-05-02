@@ -11,11 +11,11 @@ import torch.optim as optim
 
 class Model(object):
 
-    def __init__(self, vocab, network):
+    def __init__(self, vocab, parser):
         super(Model, self).__init__()
 
         self.vocab = vocab
-        self.network = network
+        self.parser = parser
         self.criterion = nn.CrossEntropyLoss()
 
     def __call__(self, loaders, epochs, patience,
@@ -23,7 +23,7 @@ class Model(object):
         total_time = timedelta()
         best_e, best_metric = 1, AttachmentMethod()
         train_loader, dev_loader, test_loader = loaders
-        self.optimizer = optim.Adam(params=self.network.parameters(),
+        self.optimizer = optim.Adam(params=self.parser.parameters(),
                                     lr=lr, betas=betas, eps=epsilon)
         self.scheduler = optim.lr_scheduler.LambdaLR(optimizer=self.optimizer,
                                                      lr_lambda=annealing)
@@ -45,14 +45,14 @@ class Model(object):
             # save the model if it is the best so far
             if dev_metric_p > best_metric and epoch > patience:
                 best_e, best_metric = epoch, dev_metric_p
-                self.network.save(file + f".{best_e}")
+                self.parser.save(file + f".{best_e}")
                 print(f"{t}s elapsed (saved)\n")
             else:
                 print(f"{t}s elapsed\n")
             total_time += t
             if epoch - best_e >= patience:
                 break
-        self.network = BiaffineParser.load(file + f".{best_e}")
+        self.parser = BiaffineParser.load(file + f".{best_e}")
         loss, metric_t, metric_p = self.evaluate(test_loader)
 
         print(f"max score of dev is {best_metric.score:.2%} at epoch {best_e}")
@@ -61,7 +61,7 @@ class Model(object):
         print(f"{total_time}s elapsed")
 
     def train(self, loader):
-        self.network.train()
+        self.parser.train()
 
         for words, chars, tags, arcs, rels in loader:
             self.optimizer.zero_grad()
@@ -69,7 +69,7 @@ class Model(object):
             mask = words.ne(self.vocab.pad_index)
             # ignore the first token of each sentence
             mask[:, 0] = 0
-            s_tag, s_arc, s_rel = self.network(words, chars)
+            s_tag, s_arc, s_rel = self.parser(words, chars)
             s_tag, s_arc, s_rel = s_tag[mask], s_arc[mask], s_rel[mask]
             gold_tags = tags[mask]
             gold_arcs, gold_rels = arcs[mask], rels[mask]
@@ -77,13 +77,13 @@ class Model(object):
             loss = self.get_loss(s_tag, s_arc, s_rel,
                                  gold_tags, gold_arcs, gold_rels)
             loss.backward()
-            nn.utils.clip_grad_norm_(self.network.parameters(), 5.0)
+            nn.utils.clip_grad_norm_(self.parser.parameters(), 5.0)
             self.optimizer.step()
             self.scheduler.step()
 
     @torch.no_grad()
     def evaluate(self, loader):
-        self.network.eval()
+        self.parser.eval()
 
         loss, metric_t, metric_p = 0, AccuracyMethod(), AttachmentMethod()
 
@@ -91,7 +91,7 @@ class Model(object):
             mask = words.ne(self.vocab.pad_index)
             # ignore the first token of each sentence
             mask[:, 0] = 0
-            s_tag, s_arc, s_rel = self.network(words, chars)
+            s_tag, s_arc, s_rel = self.parser(words, chars)
             s_tag, s_arc, s_rel = s_tag[mask], s_arc[mask], s_rel[mask]
             gold_tags, pred_tags = tags[mask], s_tag.argmax(dim=-1)
             gold_arcs, gold_rels = arcs[mask], rels[mask]
@@ -107,7 +107,7 @@ class Model(object):
 
     @torch.no_grad()
     def predict(self, loader):
-        self.network.eval()
+        self.parser.eval()
 
         all_arcs, all_rels = [], []
         for words, chars in loader:
@@ -115,7 +115,7 @@ class Model(object):
             # ignore the first token of each sentence
             mask[:, 0] = 0
             lens = mask.sum(dim=1).tolist()
-            s_tag, s_arc, s_rel = self.network(words, chars)
+            s_tag, s_arc, s_rel = self.parser(words, chars)
             s_tag, s_arc, s_rel = s_tag[mask], s_arc[mask], s_rel[mask]
             pred_arcs, pred_rels = self.decode(s_arc, s_rel)
 

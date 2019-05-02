@@ -25,8 +25,8 @@ class Evaluate(object):
     def __call__(self, config):
         print("Load the model")
         vocab = torch.load(config.vocab)
-        network = BiaffineParser.load(config.file)
-        model = Model(vocab, network)
+        parser = BiaffineParser.load(config.file)
+        model = Model(vocab, parser)
 
         print("Load the dataset")
         corpus = Corpus.load(config.fdata)
