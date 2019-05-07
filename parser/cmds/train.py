@@ -3,7 +3,7 @@
 import os
 from datetime import datetime, timedelta
 from parser import BiaffineParser, Model
-from parser.metric import AttachmentMethod
+from parser.metrics import AttachmentMethod
 from parser.utils import Corpus, Embedding, Vocab
 from parser.utils.data import TextDataset, batchify
 
@@ -86,7 +86,7 @@ class Train(object):
         best_e, best_metric = 1, AttachmentMethod()
         model.optimizer = Adam(model.parser.parameters(),
                                config.lr,
-                               (config.beta_1, config.beta_2),
+                               (config.mu, config.nu),
                                config.epsilon)
         model.scheduler = ExponentialLR(model.optimizer,
                                         config.decay ** (1 / config.steps))
