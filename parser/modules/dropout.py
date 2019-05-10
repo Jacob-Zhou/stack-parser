@@ -31,8 +31,8 @@ class SharedDropout(nn.Module):
 
     @staticmethod
     def get_mask(x, p):
-        mask = x.new_full(x.shape, 1 - p)
-        mask = mask.bernoulli_() / (1 - p)
+        mask = x.new_empty(x.shape).bernoulli_(1 - p)
+        mask = mask / (1 - p)
 
         return mask
 
@@ -49,7 +49,7 @@ class IndependentDropout(nn.Module):
 
     def forward(self, *items):
         if self.training:
-            masks = [torch.bernoulli(x.new_full(x.shape[:2], 1 - self.p))
+            masks = [x.new_empty(x.shape[:2]).bernoulli_(1 - self.p)
                      for x in items]
             total = sum(masks)
             scale = len(items) / total.max(torch.ones_like(total))
