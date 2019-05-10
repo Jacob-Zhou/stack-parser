@@ -1,12 +1,9 @@
 # -*- coding: utf-8 -*-
 
-from datetime import datetime, timedelta
 from parser.metrics import AccuracyMethod, AttachmentMethod
-from parser.parser import BiaffineParser
 
 import torch
 import torch.nn as nn
-import torch.optim as optim
 
 
 class Model(object):
