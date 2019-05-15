@@ -17,19 +17,21 @@ class BiaffineParser(nn.Module):
         self.config = config
         # the embedding layer
         self.pretrained = nn.Embedding.from_pretrained(embeddings)
-        self.embed = nn.Embedding(num_embeddings=config.n_words,
-                                  embedding_dim=config.n_embed)
+        self.word_embed = nn.Embedding(num_embeddings=config.n_words,
+                                       embedding_dim=config.n_embed)
+        self.tag_embed = nn.Embedding(num_embeddings=config.n_tags,
+                                      embedding_dim=config.n_embed)
         # the char-lstm layer
         self.char_lstm = CHAR_LSTM(n_chars=config.n_chars,
                                    n_embed=config.n_char_embed,
-                                   n_out=config.n_char_out)
+                                   n_out=config.n_embed)
         self.embed_dropout = IndependentDropout(p=config.embed_dropout)
 
         # the word-lstm layer
-        self.tag_lstm = BiLSTM(input_size=config.n_embed+config.n_char_out,
+        self.tag_lstm = BiLSTM(input_size=config.n_embed*2,
                                hidden_size=config.n_lstm_hidden,
                                dropout=config.lstm_dropout)
-        self.dep_lstm = BiLSTM(input_size=config.n_embed+config.n_char_out+config.n_mlp_arc,
+        self.dep_lstm = BiLSTM(input_size=config.n_embed*3,
                                hidden_size=config.n_lstm_hidden,
                                num_layers=config.n_lstm_layers,
                                dropout=config.lstm_dropout)
@@ -37,8 +39,7 @@ class BiaffineParser(nn.Module):
 
         # the MLP layers
         self.mlp_tag = MLP(n_in=config.n_lstm_hidden*2,
-                           n_hidden=config.n_mlp_arc,
-                           dropout=config.mlp_dropout)
+                           n_hidden=config.n_mlp_arc)
         self.mlp_arc_h = MLP(n_in=config.n_lstm_hidden*2,
                              n_hidden=config.n_mlp_arc,
                              dropout=config.mlp_dropout)
@@ -69,18 +70,18 @@ class BiaffineParser(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        nn.init.zeros_(self.embed.weight)
+        nn.init.zeros_(self.word_embed.weight)
 
     def forward(self, words, chars):
         # get the mask and lengths of given batch
         mask = words.ne(self.pad_index)
         lens = mask.sum(dim=1)
         # set the indices larger than num_embeddings to unk_index
-        ext_mask = words.ge(self.embed.num_embeddings)
+        ext_mask = words.ge(self.word_embed.num_embeddings)
         ext_words = words.masked_fill(ext_mask, self.unk_index)
 
         # get outputs from embedding layers
-        word_embed = self.pretrained(words) + self.embed(ext_words)
+        word_embed = self.pretrained(words) + self.word_embed(ext_words)
         char_embed = self.char_lstm(chars[mask])
         char_embed = pad_sequence(torch.split(char_embed, lens.tolist()), True)
         word_embed, char_embed = self.embed_dropout(word_embed, char_embed)
@@ -94,8 +95,10 @@ class BiaffineParser(nn.Module):
         x_tag, _ = pad_packed_sequence(x_tag, True)
         x_tag = self.lstm_dropout(x_tag)[inverse_indices]
         s_tag = self.mlp_tag(x_tag)
+        s_tag = self.ffn_tag(s_tag)
 
-        embed = torch.cat((embed, s_tag), dim=-1)
+        tag_embed = s_tag.softmax(dim=-1) @ self.tag_embed.weight
+        embed = torch.cat((embed, tag_embed), dim=-1)
         x_dep = pack_padded_sequence(embed[indices], sorted_lens, True)
         x_dep = self.dep_lstm(x_dep)
         x_dep, _ = pad_packed_sequence(x_dep, True)
@@ -107,7 +110,6 @@ class BiaffineParser(nn.Module):
         rel_h = self.mlp_rel_h(x_dep)
         rel_d = self.mlp_rel_d(x_dep)
 
-        s_tag = self.ffn_tag(s_tag)
         # get arc and rel scores from the bilinear attention
         # [batch_size, seq_len, seq_len]
         s_arc = self.arc_attn(arc_d, arc_h)
