@@ -16,7 +16,7 @@ class Vocab(object):
 
         self.words = [self.PAD, self.UNK] + sorted(words)
         self.chars = [self.PAD, self.UNK] + sorted(chars)
-        self.tags = [self.PAD, self.UNK] + sorted(tags)
+        self.tags = sorted(tags)
         self.rels = sorted(rels)
 
         self.word_dict = {word: i for i, word in enumerate(self.words)}
@@ -57,7 +57,7 @@ class Vocab(object):
         return char_ids
 
     def tag2id(self, sequence):
-        return torch.tensor([self.tag_dict.get(tag, self.unk_index)
+        return torch.tensor([self.tag_dict.get(tag, 0)
                              for tag in sequence])
 
     def rel2id(self, sequence):
