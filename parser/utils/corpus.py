@@ -37,7 +37,7 @@ class Corpus(object):
 
     @property
     def tags(self):
-        return [[self.ROOT] + list(sentence.CPOS) for sentence in self]
+        return [[self.ROOT] + list(sentence.POS) for sentence in self]
 
     @property
     def heads(self):

@@ -20,11 +20,11 @@ class Train(object):
         )
         subparser.add_argument('--buckets', default=64, type=int,
                                help='max num of buckets to use')
-        subparser.add_argument('--ftrain', default='data/train.gold.conllx',
+        subparser.add_argument('--ftrain', default='data/conll09/train.conllx',
                                help='path to train file')
-        subparser.add_argument('--fdev', default='data/dev.gold.conllx',
+        subparser.add_argument('--fdev', default='data/conll09/dev.conllx',
                                help='path to dev file')
-        subparser.add_argument('--ftest', default='data/test.gold.conllx',
+        subparser.add_argument('--ftest', default='data/conll09/test.conllx',
                                help='path to test file')
         subparser.add_argument('--fembed', default='data/giga.100.txt',
                                help='path to pretrained embedding file')

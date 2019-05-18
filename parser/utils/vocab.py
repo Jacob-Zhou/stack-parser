@@ -64,6 +64,9 @@ class Vocab(object):
         return torch.tensor([self.rel_dict.get(rel, 0)
                              for rel in sequence])
 
+    def id2tag(self, ids):
+        return [self.tags[i] for i in ids]
+
     def id2rel(self, ids):
         return [self.rels[i] for i in ids]
 

@@ -72,6 +72,7 @@ class BiLSTM(nn.Module):
             init = x.new_zeros(max_batch_size, self.hidden_size)
             hx = (init, init)
 
+        output = []
         for layer in range(self.num_layers):
             if self.training:
                 mask = SharedDropout.get_mask(x[:max_batch_size], self.dropout)
@@ -90,6 +91,6 @@ class BiLSTM(nn.Module):
                                           batch_sizes=batch_sizes,
                                           reverse=True)
             x = torch.cat([f_output, b_output], -1)
-        x = PackedSequence(x, sequence.batch_sizes)
+            output.append(PackedSequence(x, sequence.batch_sizes))
 
-        return x
+        return output
