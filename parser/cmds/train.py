@@ -20,6 +20,8 @@ class Train(object):
         )
         subparser.add_argument('--buckets', default=64, type=int,
                                help='max num of buckets to use')
+        subparser.add_argument('--fpos', default='data/pku/train',
+                               help='path to pos file')
         subparser.add_argument('--ftrain', default='data/conll09/train.conllx',
                                help='path to train file')
         subparser.add_argument('--fdev', default='data/conll09/dev.conllx',
@@ -33,19 +35,21 @@ class Train(object):
 
     def __call__(self, config):
         print("Preprocess the data")
-        train = Corpus.load(config.ftrain)
+        tag_train = Corpus.load(config.fpos, columns=[1, 4])
+        dep_train = Corpus.load(config.ftrain)
         dev = Corpus.load(config.fdev)
         test = Corpus.load(config.ftest)
         if os.path.exists(config.vocab):
             vocab = torch.load(config.vocab)
         else:
-            vocab = Vocab.from_corpus(corpus=train, min_freq=2)
+            vocab = Vocab.from_corpora(tag_train, dep_train, 2)
             vocab.read_embeddings(Embedding.load(config.fembed))
             torch.save(vocab, config.vocab)
         config.update({
             'n_words': vocab.n_train_words,
             'n_chars': vocab.n_chars,
-            'n_tags': vocab.n_tags,
+            'n_t_tags': vocab.n_t_tags,
+            'n_d_tags': vocab.n_d_tags,
             'n_rels': vocab.n_rels,
             'pad_index': vocab.pad_index,
             'unk_index': vocab.unk_index
@@ -53,26 +57,34 @@ class Train(object):
         print(vocab)
 
         print("Load the dataset")
-        trainset = TextDataset(vocab.numericalize(train))
+        tag_trainset = TextDataset(vocab.numericalize(tag_train, False))
+        dep_trainset = TextDataset(vocab.numericalize(dep_train))
         devset = TextDataset(vocab.numericalize(dev))
         testset = TextDataset(vocab.numericalize(test))
+        print(f"Set the data loaders")
         # set the data loaders
-        train_loader = batchify(dataset=trainset,
-                                batch_size=config.batch_size,
-                                n_buckets=config.buckets,
-                                shuffle=True)
+        tag_train_loader = batchify(dataset=tag_trainset,
+                                    batch_size=config.batch_size,
+                                    n_buckets=config.buckets,
+                                    shuffle=True)
+        dep_train_loader = batchify(dataset=dep_trainset,
+                                    batch_size=config.batch_size,
+                                    n_buckets=config.buckets,
+                                    shuffle=True)
         dev_loader = batchify(dataset=devset,
                               batch_size=config.batch_size,
                               n_buckets=config.buckets)
         test_loader = batchify(dataset=testset,
                                batch_size=config.batch_size,
                                n_buckets=config.buckets)
-        print(f"{'train:':6} {len(trainset):5} sentences in total, "
-              f"{len(train_loader):3} batches provided")
-        print(f"{'dev:':6} {len(devset):5} sentences in total, "
-              f"{len(dev_loader):3} batches provided")
-        print(f"{'test:':6} {len(testset):5} sentences in total, "
-              f"{len(test_loader):3} batches provided")
+        print(f"{'tag_train:':10} {len(tag_trainset):7} sentences in total, "
+              f"{len(tag_train_loader):4} batches provided")
+        print(f"{'dep_train:':10} {len(dep_trainset):7} sentences in total, "
+              f"{len(dep_train_loader):4} batches provided")
+        print(f"{'dev:':10} {len(devset):7} sentences in total, "
+              f"{len(dev_loader):4} batches provided")
+        print(f"{'test:':10} {len(testset):7} sentences in total, "
+              f"{len(test_loader):4} batches provided")
 
         print("Create the model")
         parser = BiaffineParser(config, vocab.embeddings)
@@ -91,13 +103,14 @@ class Train(object):
         model.scheduler = ExponentialLR(model.optimizer,
                                         config.decay ** (1 / config.steps))
 
+        count = 0
         for epoch in range(1, config.epochs + 1):
             start = datetime.now()
             # train one epoch and update the parameters
-            model.train(train_loader)
+            count = model.train(dep_train_loader, tag_train_loader, count)
 
             print(f"Epoch {epoch} / {config.epochs}:")
-            loss, metric_t, metric_p = model.evaluate(train_loader)
+            loss, metric_t, metric_p = model.evaluate(dep_train_loader)
             print(f"{'train:':6} Loss: {loss:.4f} {metric_t} {metric_p}")
             loss, dev_metric_t, dev_metric_p = model.evaluate(dev_loader)
             print(f"{'dev:':6} Loss: {loss:.4f} {dev_metric_t} {dev_metric_p}")

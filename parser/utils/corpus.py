@@ -33,18 +33,26 @@ class Corpus(object):
 
     @property
     def words(self):
+        if not self.sentences[0].FORM:
+            raise AttributeError
         return [[self.ROOT] + list(sentence.FORM) for sentence in self]
 
     @property
     def tags(self):
+        if not self.sentences[0].POS:
+            raise AttributeError
         return [[self.ROOT] + list(sentence.POS) for sentence in self]
 
     @property
     def heads(self):
+        if not self.sentences[0].HEAD:
+            raise AttributeError
         return [[0] + list(map(int, sentence.HEAD)) for sentence in self]
 
     @property
     def rels(self):
+        if not self.sentences[0].DEPREL:
+            raise AttributeError
         return [[self.ROOT] + list(sentence.DEPREL) for sentence in self]
 
     @heads.setter
@@ -58,13 +66,15 @@ class Corpus(object):
                           for sentence, sequence in zip(self, sequences)]
 
     @classmethod
-    def load(cls, fname):
+    def load(cls, fname, columns=range(10)):
         start, sentences = 0, []
+        names = [Sentence._fields[col] for col in columns]
         with open(fname, 'r') as f:
             lines = [line.strip() for line in f]
         for i, line in enumerate(lines):
             if not line:
-                sentence = Sentence(*zip(*[l.split() for l in lines[start:i]]))
+                values = zip(*[l.split() for l in lines[start:i]])
+                sentence = Sentence(**dict(zip(names, values)))
                 sentences.append(sentence)
                 start = i + 1
         corpus = cls(sentences)

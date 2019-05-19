@@ -10,18 +10,20 @@ class Vocab(object):
     PAD = '<PAD>'
     UNK = '<UNK>'
 
-    def __init__(self, words, chars, tags, rels):
+    def __init__(self, words, chars, t_tags, d_tags, rels):
         self.pad_index = 0
         self.unk_index = 1
 
         self.words = [self.PAD, self.UNK] + sorted(words)
         self.chars = [self.PAD, self.UNK] + sorted(chars)
-        self.tags = sorted(tags)
+        self.t_tags = sorted(t_tags)
+        self.d_tags = sorted(d_tags)
         self.rels = sorted(rels)
 
         self.word_dict = {word: i for i, word in enumerate(self.words)}
         self.char_dict = {char: i for i, char in enumerate(self.chars)}
-        self.tag_dict = {tag: i for i, tag in enumerate(self.tags)}
+        self.t_tag_dict = {tag: i for i, tag in enumerate(self.t_tags)}
+        self.d_tag_dict = {tag: i for i, tag in enumerate(self.d_tags)}
         self.rel_dict = {rel: i for i, rel in enumerate(self.rels)}
 
         # ids of punctuation that appear in words
@@ -30,7 +32,8 @@ class Vocab(object):
 
         self.n_words = len(self.words)
         self.n_chars = len(self.chars)
-        self.n_tags = len(self.tags)
+        self.n_t_tags = len(self.t_tags)
+        self.n_d_tags = len(self.d_tags)
         self.n_rels = len(self.rels)
         self.n_train_words = self.n_words
 
@@ -38,7 +41,8 @@ class Vocab(object):
         info = f"{self.__class__.__name__}: "
         info += f"{self.n_words} words, "
         info += f"{self.n_chars} chars, "
-        info += f"{self.n_tags} tags, "
+        info += f"{self.n_t_tags} t_tags, "
+        info += f"{self.n_d_tags} d_tags, "
         info += f"{self.n_rels} rels"
 
         return info
@@ -56,8 +60,12 @@ class Vocab(object):
 
         return char_ids
 
-    def tag2id(self, sequence):
-        return torch.tensor([self.tag_dict.get(tag, 0)
+    def t_tag2id(self, sequence):
+        return torch.tensor([self.t_tag_dict.get(tag, 0)
+                             for tag in sequence])
+
+    def d_tag2id(self, sequence):
+        return torch.tensor([self.d_tag_dict.get(tag, 0)
                              for tag in sequence])
 
     def rel2id(self, sequence):
@@ -95,24 +103,29 @@ class Vocab(object):
         self.n_words = len(self.words)
         self.n_chars = len(self.chars)
 
-    def numericalize(self, corpus, training=True):
+    def numericalize(self, corpus, dep=True, training=True):
         words = [self.word2id(seq) for seq in corpus.words]
         chars = [self.char2id(seq) for seq in corpus.words]
         if not training:
             return words, chars
-        tags = [self.tag2id(seq) for seq in corpus.tags]
-        arcs = [torch.tensor(seq) for seq in corpus.heads]
-        rels = [self.rel2id(seq) for seq in corpus.rels]
-
-        return words, chars, tags, arcs, rels
+        if not dep:
+            tags = [self.t_tag2id(seq) for seq in corpus.tags]
+            return words, chars, tags
+        else:
+            tags = [self.d_tag2id(seq) for seq in corpus.tags]
+            arcs = [torch.tensor(seq) for seq in corpus.heads]
+            rels = [self.rel2id(seq) for seq in corpus.rels]
+            return words, chars, tags, arcs, rels
 
     @classmethod
-    def from_corpus(cls, corpus, min_freq=1):
-        words = Counter(word.lower() for seq in corpus.words for word in seq)
+    def from_corpora(cls, tag_corpus, dep_corpus, min_freq=1):
+        word_seqs = tag_corpus.words + dep_corpus.words
+        words = Counter(word.lower() for seq in word_seqs for word in seq)
         words = list(word for word, freq in words.items() if freq >= min_freq)
-        chars = list({char for seq in corpus.words for char in ''.join(seq)})
-        tags = list({tag for seq in corpus.tags for tag in seq})
-        rels = list({rel for seq in corpus.rels for rel in seq})
-        vocab = cls(words, chars, tags, rels)
+        chars = list({char for seq in word_seqs for char in ''.join(seq)})
+        t_tags = list({tag for seq in tag_corpus.tags for tag in seq})
+        d_tags = list({tag for seq in dep_corpus.tags for tag in seq})
+        rels = list({rel for seq in dep_corpus.rels for rel in seq})
+        vocab = cls(words, chars, t_tags, d_tags, rels)
 
         return vocab
