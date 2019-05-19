@@ -50,8 +50,8 @@ class BiaffineParser(nn.Module):
                              n_hidden=config.n_mlp_rel,
                              dropout=config.mlp_dropout)
 
-        self.ffn_t_tag = nn.Linear(config.n_mlp_arc,
-                                   config.n_t_tags)
+        self.ffn_p_tag = nn.Linear(config.n_mlp_arc,
+                                   config.n_p_tags)
         self.ffn_d_tag = nn.Linear(config.n_mlp_arc,
                                    config.n_d_tags)
         # the Biaffine layers
@@ -70,6 +70,10 @@ class BiaffineParser(nn.Module):
 
     def reset_parameters(self):
         nn.init.zeros_(self.word_embed.weight)
+        nn.init.orthogonal_(self.ffn_p_tag.weight)
+        nn.init.orthogonal_(self.ffn_d_tag.weight)
+        nn.init.zeros_(self.ffn_p_tag.bias)
+        nn.init.zeros_(self.ffn_d_tag.bias)
 
     def forward(self, words, chars, dep=True):
         # get the mask and lengths of given batch
@@ -91,15 +95,15 @@ class BiaffineParser(nn.Module):
         inverse_indices = indices.argsort()
         x = pack_padded_sequence(x[indices], sorted_lens, True)
         x = [pad_packed_sequence(i, True)[0] for i in self.lstm(x)]
-        x_tag = self.tag_mix(torch.stack(x))
-        x_tag = self.lstm_dropout(x_tag)[inverse_indices]
+        x_pos = self.tag_mix(torch.stack(x))
+        x_pos = self.lstm_dropout(x_pos)[inverse_indices]
         x_dep = self.lstm_dropout(x[-1])[inverse_indices]
-        x_tag = self.mlp_tag(x_tag)
+        x_pos = self.mlp_tag(x_pos)
 
         if not dep:
-            return self.ffn_t_tag(x_tag)
+            return self.ffn_p_tag(x_pos)
         else:
-            s_tag = self.ffn_d_tag(x_tag)
+            s_pos = self.ffn_d_tag(x_pos)
         # apply MLPs to the BiLSTM output states
         arc_h = self.mlp_arc_h(x_dep)
         arc_d = self.mlp_arc_d(x_dep)
@@ -114,7 +118,7 @@ class BiaffineParser(nn.Module):
         # set the scores that exceed the length of each sentence to -inf
         s_arc.masked_fill_(~mask.unsqueeze(1), float('-inf'))
 
-        return s_tag, s_arc, s_rel
+        return s_pos, s_arc, s_rel
 
     @classmethod
     def load(cls, fname):
@@ -156,13 +160,13 @@ class BiaffineParser(nn.Module):
         }
         torch.save(state, fname)
 
-    def get_loss(self, s_tag, s_arc, s_rel, gold_tags, gold_arcs, gold_rels):
+    def get_loss(self, s_pos, s_arc, s_rel, gold_tags, gold_arcs, gold_rels):
         s_rel = s_rel[torch.arange(len(s_rel)), gold_arcs]
 
-        tag_loss = self.criterion(s_tag, gold_tags)
+        pos_loss = self.criterion(s_pos, gold_tags)
         arc_loss = self.criterion(s_arc, gold_arcs)
         rel_loss = self.criterion(s_rel, gold_rels)
-        loss = tag_loss + arc_loss + rel_loss
+        loss = pos_loss + arc_loss + rel_loss
 
         return loss
 

@@ -48,7 +48,7 @@ class Train(object):
         config.update({
             'n_words': vocab.n_train_words,
             'n_chars': vocab.n_chars,
-            'n_t_tags': vocab.n_t_tags,
+            'n_p_tags': vocab.n_p_tags,
             'n_d_tags': vocab.n_d_tags,
             'n_rels': vocab.n_rels,
             'pad_index': vocab.pad_index,
@@ -64,7 +64,7 @@ class Train(object):
         print(f"Set the data loaders")
         # set the data loaders
         tag_train_loader = batchify(dataset=tag_trainset,
-                                    batch_size=config.batch_size,
+                                    batch_size=config.pos_batch_size,
                                     n_buckets=config.buckets,
                                     shuffle=True)
         dep_train_loader = batchify(dataset=dep_trainset,

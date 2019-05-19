@@ -10,19 +10,19 @@ class Vocab(object):
     PAD = '<PAD>'
     UNK = '<UNK>'
 
-    def __init__(self, words, chars, t_tags, d_tags, rels):
+    def __init__(self, words, chars, p_tags, d_tags, rels):
         self.pad_index = 0
         self.unk_index = 1
 
         self.words = [self.PAD, self.UNK] + sorted(words)
         self.chars = [self.PAD, self.UNK] + sorted(chars)
-        self.t_tags = sorted(t_tags)
+        self.p_tags = sorted(p_tags)
         self.d_tags = sorted(d_tags)
         self.rels = sorted(rels)
 
         self.word_dict = {word: i for i, word in enumerate(self.words)}
         self.char_dict = {char: i for i, char in enumerate(self.chars)}
-        self.t_tag_dict = {tag: i for i, tag in enumerate(self.t_tags)}
+        self.p_tag_dict = {tag: i for i, tag in enumerate(self.p_tags)}
         self.d_tag_dict = {tag: i for i, tag in enumerate(self.d_tags)}
         self.rel_dict = {rel: i for i, rel in enumerate(self.rels)}
 
@@ -32,7 +32,7 @@ class Vocab(object):
 
         self.n_words = len(self.words)
         self.n_chars = len(self.chars)
-        self.n_t_tags = len(self.t_tags)
+        self.n_p_tags = len(self.p_tags)
         self.n_d_tags = len(self.d_tags)
         self.n_rels = len(self.rels)
         self.n_train_words = self.n_words
@@ -41,7 +41,7 @@ class Vocab(object):
         info = f"{self.__class__.__name__}: "
         info += f"{self.n_words} words, "
         info += f"{self.n_chars} chars, "
-        info += f"{self.n_t_tags} t_tags, "
+        info += f"{self.n_p_tags} p_tags, "
         info += f"{self.n_d_tags} d_tags, "
         info += f"{self.n_rels} rels"
 
@@ -60,8 +60,8 @@ class Vocab(object):
 
         return char_ids
 
-    def t_tag2id(self, sequence):
-        return torch.tensor([self.t_tag_dict.get(tag, 0)
+    def p_tag2id(self, sequence):
+        return torch.tensor([self.p_tag_dict.get(tag, 0)
                              for tag in sequence])
 
     def d_tag2id(self, sequence):
@@ -109,7 +109,7 @@ class Vocab(object):
         if not training:
             return words, chars
         if not dep:
-            tags = [self.t_tag2id(seq) for seq in corpus.tags]
+            tags = [self.p_tag2id(seq) for seq in corpus.tags]
             return words, chars, tags
         else:
             tags = [self.d_tag2id(seq) for seq in corpus.tags]
@@ -123,9 +123,9 @@ class Vocab(object):
         words = Counter(word.lower() for seq in word_seqs for word in seq)
         words = list(word for word, freq in words.items() if freq >= min_freq)
         chars = list({char for seq in word_seqs for char in ''.join(seq)})
-        t_tags = list({tag for seq in tag_corpus.tags for tag in seq})
+        p_tags = list({tag for seq in tag_corpus.tags for tag in seq})
         d_tags = list({tag for seq in dep_corpus.tags for tag in seq})
         rels = list({rel for seq in dep_corpus.rels for rel in seq})
-        vocab = cls(words, chars, t_tags, d_tags, rels)
+        vocab = cls(words, chars, p_tags, d_tags, rels)
 
         return vocab

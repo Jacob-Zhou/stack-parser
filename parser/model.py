@@ -20,31 +20,31 @@ class Model(object):
         tag_iter = iter(tag_loader)
         for words, chars, tags, arcs, rels in dep_loader:
             self.optimizer.zero_grad()
-
-            mask = words.ne(self.vocab.pad_index)
+            if count == len(tag_loader):
+                count, tag_iter = 0, iter(tag_loader)
+            pos_words, pos_chars, pos_tags = next(tag_iter)
+            mask = pos_words.ne(self.vocab.pad_index)
             # ignore the first token of each sentence
             mask[:, 0] = 0
-            s_tag, s_arc, s_rel = self.parser(words, chars)
-            s_tag, s_arc, s_rel = s_tag[mask], s_arc[mask], s_rel[mask]
-            gold_tags = tags[mask]
-            gold_arcs, gold_rels = arcs[mask], rels[mask]
+            s_pos = self.parser(pos_words, pos_chars, False)[mask]
+            gold_tags = pos_tags[mask]
 
-            loss = self.parser.get_loss(s_tag, s_arc, s_rel,
-                                        gold_tags, gold_arcs, gold_rels)
+            loss = self.parser.criterion(s_pos, gold_tags)
             loss.backward()
             nn.utils.clip_grad_norm_(self.parser.parameters(), 5.0)
             self.optimizer.step()
 
-            if count == len(tag_loader):
-                count, tag_iter = 0, iter(tag_loader)
-            words, chars, tags = next(tag_iter)
+            self.optimizer.zero_grad()
             mask = words.ne(self.vocab.pad_index)
             # ignore the first token of each sentence
             mask[:, 0] = 0
-            s_tag = self.parser(words, chars, False)[mask]
+            s_pos, s_arc, s_rel = self.parser(words, chars)
+            s_pos, s_arc, s_rel = s_pos[mask], s_arc[mask], s_rel[mask]
             gold_tags = tags[mask]
+            gold_arcs, gold_rels = arcs[mask], rels[mask]
 
-            loss = self.parser.criterion(s_tag, gold_tags)
+            loss = self.parser.get_loss(s_pos, s_arc, s_rel,
+                                        gold_tags, gold_arcs, gold_rels)
             loss.backward()
             nn.utils.clip_grad_norm_(self.parser.parameters(), 5.0)
             self.optimizer.step()
@@ -60,13 +60,13 @@ class Model(object):
             mask = words.ne(self.vocab.pad_index)
             # ignore the first token of each sentence
             mask[:, 0] = 0
-            s_tag, s_arc, s_rel = self.parser(words, chars)
-            s_tag, s_arc, s_rel = s_tag[mask], s_arc[mask], s_rel[mask]
-            gold_tags, pred_tags = tags[mask], s_tag.argmax(dim=-1)
+            s_pos, s_arc, s_rel = self.parser(words, chars)
+            s_pos, s_arc, s_rel = s_pos[mask], s_arc[mask], s_rel[mask]
+            gold_tags, pred_tags = tags[mask], s_pos.argmax(dim=-1)
             gold_arcs, gold_rels = arcs[mask], rels[mask]
             pred_arcs, pred_rels = self.parser.decode(s_arc, s_rel)
 
-            loss += self.parser.get_loss(s_tag, s_arc, s_rel,
+            loss += self.parser.get_loss(s_pos, s_arc, s_rel,
                                          gold_tags, gold_arcs, gold_rels)
             metric_t(pred_tags, gold_tags)
             metric_p(pred_arcs, pred_rels, gold_arcs, gold_rels)
@@ -84,8 +84,8 @@ class Model(object):
             # ignore the first token of each sentence
             mask[:, 0] = 0
             lens = mask.sum(dim=1).tolist()
-            s_tag, s_arc, s_rel = self.parser(words, chars)
-            s_tag, s_arc, s_rel = s_tag[mask], s_arc[mask], s_rel[mask]
+            s_pos, s_arc, s_rel = self.parser(words, chars)
+            s_pos, s_arc, s_rel = s_pos[mask], s_arc[mask], s_rel[mask]
             pred_arcs, pred_rels = self.parser.decode(s_arc, s_rel)
 
             all_arcs.extend(torch.split(pred_arcs, lens))
