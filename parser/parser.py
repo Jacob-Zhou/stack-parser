@@ -50,10 +50,10 @@ class BiaffineParser(nn.Module):
                              n_hidden=config.n_mlp_rel,
                              dropout=config.mlp_dropout)
 
-        self.ffn_p_tag = nn.Linear(config.n_mlp_arc,
-                                   config.n_p_tags)
-        self.ffn_d_tag = nn.Linear(config.n_mlp_arc,
-                                   config.n_d_tags)
+        self.ffn_pos_tag = nn.Linear(config.n_mlp_arc,
+                                     config.n_pos_tags)
+        self.ffn_dep_tag = nn.Linear(config.n_mlp_arc,
+                                     config.n_dep_tags)
         # the Biaffine layers
         self.arc_attn = Biaffine(n_in=config.n_mlp_arc,
                                  bias_x=True,
@@ -70,10 +70,10 @@ class BiaffineParser(nn.Module):
 
     def reset_parameters(self):
         nn.init.zeros_(self.word_embed.weight)
-        nn.init.orthogonal_(self.ffn_p_tag.weight)
-        nn.init.orthogonal_(self.ffn_d_tag.weight)
-        nn.init.zeros_(self.ffn_p_tag.bias)
-        nn.init.zeros_(self.ffn_d_tag.bias)
+        nn.init.orthogonal_(self.ffn_pos_tag.weight)
+        nn.init.orthogonal_(self.ffn_dep_tag.weight)
+        nn.init.zeros_(self.ffn_pos_tag.bias)
+        nn.init.zeros_(self.ffn_dep_tag.bias)
 
     def forward(self, words, chars, dep=True):
         # get the mask and lengths of given batch
@@ -101,9 +101,9 @@ class BiaffineParser(nn.Module):
         x_pos = self.mlp_tag(x_pos)
 
         if not dep:
-            return self.ffn_p_tag(x_pos)
+            return self.ffn_pos_tag(x_pos)
         else:
-            s_pos = self.ffn_d_tag(x_pos)
+            s_pos = self.ffn_dep_tag(x_pos)
         # apply MLPs to the BiLSTM output states
         arc_h = self.mlp_arc_h(x_dep)
         arc_d = self.mlp_arc_d(x_dep)

@@ -48,8 +48,8 @@ class Train(object):
         config.update({
             'n_words': vocab.n_train_words,
             'n_chars': vocab.n_chars,
-            'n_p_tags': vocab.n_p_tags,
-            'n_d_tags': vocab.n_d_tags,
+            'n_pos_tags': vocab.n_pos_tags,
+            'n_dep_tags': vocab.n_dep_tags,
             'n_rels': vocab.n_rels,
             'pad_index': vocab.pad_index,
             'unk_index': vocab.unk_index

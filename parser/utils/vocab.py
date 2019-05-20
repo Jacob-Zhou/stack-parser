@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 
+import unicodedata
 from collections import Counter
 
-import regex
 import torch
 
 
@@ -10,30 +10,30 @@ class Vocab(object):
     PAD = '<PAD>'
     UNK = '<UNK>'
 
-    def __init__(self, words, chars, p_tags, d_tags, rels):
+    def __init__(self, words, chars, pos_tags, dep_tags, rels):
         self.pad_index = 0
         self.unk_index = 1
 
         self.words = [self.PAD, self.UNK] + sorted(words)
         self.chars = [self.PAD, self.UNK] + sorted(chars)
-        self.p_tags = sorted(p_tags)
-        self.d_tags = sorted(d_tags)
+        self.pos_tags = sorted(pos_tags)
+        self.dep_tags = sorted(dep_tags)
         self.rels = sorted(rels)
 
         self.word_dict = {word: i for i, word in enumerate(self.words)}
         self.char_dict = {char: i for i, char in enumerate(self.chars)}
-        self.p_tag_dict = {tag: i for i, tag in enumerate(self.p_tags)}
-        self.d_tag_dict = {tag: i for i, tag in enumerate(self.d_tags)}
+        self.pos_tag_dict = {tag: i for i, tag in enumerate(self.pos_tags)}
+        self.dep_tag_dict = {tag: i for i, tag in enumerate(self.dep_tags)}
         self.rel_dict = {rel: i for i, rel in enumerate(self.rels)}
 
         # ids of punctuation that appear in words
         self.puncts = sorted(i for word, i in self.word_dict.items()
-                             if regex.match(r'\p{P}+$', word))
+                             if self.is_punctuation(word))
 
         self.n_words = len(self.words)
         self.n_chars = len(self.chars)
-        self.n_p_tags = len(self.p_tags)
-        self.n_d_tags = len(self.d_tags)
+        self.n_pos_tags = len(self.pos_tags)
+        self.n_dep_tags = len(self.dep_tags)
         self.n_rels = len(self.rels)
         self.n_train_words = self.n_words
 
@@ -41,8 +41,8 @@ class Vocab(object):
         info = f"{self.__class__.__name__}: "
         info += f"{self.n_words} words, "
         info += f"{self.n_chars} chars, "
-        info += f"{self.n_p_tags} p_tags, "
-        info += f"{self.n_d_tags} d_tags, "
+        info += f"{self.n_pos_tags} pos_tags, "
+        info += f"{self.n_dep_tags} dep_tags, "
         info += f"{self.n_rels} rels"
 
         return info
@@ -60,12 +60,12 @@ class Vocab(object):
 
         return char_ids
 
-    def p_tag2id(self, sequence):
-        return torch.tensor([self.p_tag_dict.get(tag, 0)
+    def pos_tag2id(self, sequence):
+        return torch.tensor([self.pos_tag_dict.get(tag, 0)
                              for tag in sequence])
 
-    def d_tag2id(self, sequence):
-        return torch.tensor([self.d_tag_dict.get(tag, 0)
+    def dep_tag2id(self, sequence):
+        return torch.tensor([self.dep_tag_dict.get(tag, 0)
                              for tag in sequence])
 
     def rel2id(self, sequence):
@@ -99,7 +99,7 @@ class Vocab(object):
         self.word_dict = {w: i for i, w in enumerate(self.words)}
         self.char_dict = {c: i for i, c in enumerate(self.chars)}
         self.puncts = sorted(i for word, i in self.word_dict.items()
-                             if regex.match(r'\p{P}+$', word))
+                             if self.is_punctuation(word))
         self.n_words = len(self.words)
         self.n_chars = len(self.chars)
 
@@ -109,10 +109,10 @@ class Vocab(object):
         if not training:
             return words, chars
         if not dep:
-            tags = [self.p_tag2id(seq) for seq in corpus.tags]
+            tags = [self.pos_tag2id(seq) for seq in corpus.tags]
             return words, chars, tags
         else:
-            tags = [self.d_tag2id(seq) for seq in corpus.tags]
+            tags = [self.dep_tag2id(seq) for seq in corpus.tags]
             arcs = [torch.tensor(seq) for seq in corpus.heads]
             rels = [self.rel2id(seq) for seq in corpus.rels]
             return words, chars, tags, arcs, rels
@@ -123,9 +123,13 @@ class Vocab(object):
         words = Counter(word.lower() for seq in word_seqs for word in seq)
         words = list(word for word, freq in words.items() if freq >= min_freq)
         chars = list({char for seq in word_seqs for char in ''.join(seq)})
-        p_tags = list({tag for seq in tag_corpus.tags for tag in seq})
-        d_tags = list({tag for seq in dep_corpus.tags for tag in seq})
+        pos_tags = list({tag for seq in tag_corpus.tags for tag in seq})
+        dep_tags = list({tag for seq in dep_corpus.tags for tag in seq})
         rels = list({rel for seq in dep_corpus.rels for rel in seq})
-        vocab = cls(words, chars, p_tags, d_tags, rels)
+        vocab = cls(words, chars, pos_tags, dep_tags, rels)
 
         return vocab
+
+    @classmethod
+    def is_punctuation(cls, word):
+        return all(unicodedata.category(char).startswith('P') for char in word)
