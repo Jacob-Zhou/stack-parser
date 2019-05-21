@@ -23,7 +23,7 @@ if __name__ == '__main__':
         subparser = subcommand.add_subparser(name, subparsers)
         subparser.add_argument('--conf', '-c', default='config.ini',
                                help='path to config file')
-        subparser.add_argument('--model', '-f', default='exp/model',
+        subparser.add_argument('--model', '-m', default='exp/model',
                                help='path to model file')
         subparser.add_argument('--vocab', '-v', default='exp/vocab',
                                help='path to vocab file')

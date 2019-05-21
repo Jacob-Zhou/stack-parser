@@ -14,22 +14,21 @@ class Model(object):
         self.vocab = vocab
         self.parser = parser
 
-    def train(self, dep_loader, tag_loader, count):
+    def train(self, tag_loader, dep_loader):
         self.parser.train()
 
         tag_iter = iter(tag_loader)
         for words, chars, tags, arcs, rels in dep_loader:
             self.optimizer.zero_grad()
-            if count == len(tag_loader):
-                count, tag_iter = 0, iter(tag_loader)
+            if self.count == len(tag_loader):
+                self.count, tag_iter = 0, iter(tag_loader)
+            self.count += 1
             pos_words, pos_chars, pos_tags = next(tag_iter)
             mask = pos_words.ne(self.vocab.pad_index)
             # ignore the first token of each sentence
             mask[:, 0] = 0
-            s_pos = self.parser(pos_words, pos_chars, False)[mask]
-            gold_tags = pos_tags[mask]
-
-            loss = self.parser.criterion(s_pos, gold_tags)
+            s_pos = self.parser(pos_words, pos_chars, False)
+            loss = self.parser.criterion(s_pos[mask], pos_tags[mask])
             loss.backward()
             nn.utils.clip_grad_norm_(self.parser.parameters(), 5.0)
             self.optimizer.step()

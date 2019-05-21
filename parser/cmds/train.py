@@ -102,13 +102,12 @@ class Train(object):
                                config.epsilon)
         model.scheduler = ExponentialLR(model.optimizer,
                                         config.decay ** (1 / config.steps))
+        model.count = 0
 
-        count = 0
         for epoch in range(1, config.epochs + 1):
             start = datetime.now()
             # train one epoch and update the parameters
-            count = model.train(dep_train_loader, tag_train_loader, count)
-
+            model.train(tag_train_loader, dep_train_loader)
             print(f"Epoch {epoch} / {config.epochs}:")
             loss, metric_t, metric_p = model.evaluate(dep_train_loader)
             print(f"{'train:':6} Loss: {loss:.4f} {metric_t} {metric_p}")
