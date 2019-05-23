@@ -2,6 +2,8 @@
 
 from collections import namedtuple
 
+import torch
+
 
 Sentence = namedtuple(typename='Sentence',
                       field_names=['ID', 'FORM', 'LEMMA', 'CPOS',
@@ -66,7 +68,7 @@ class Corpus(object):
                           for sentence, sequence in zip(self, sequences)]
 
     @classmethod
-    def load(cls, fname, columns=range(10)):
+    def load(cls, fname, columns=range(10), length=0):
         start, sentences = 0, []
         names = [Sentence._fields[col] for col in columns]
         with open(fname, 'r') as f:
@@ -77,6 +79,9 @@ class Corpus(object):
                 sentence = Sentence(**dict(zip(names, values)))
                 sentences.append(sentence)
                 start = i + 1
+        if length > 0:
+            indices = torch.randperm(len(sentences)).tolist()[:length]
+            sentences = [sentences[i] for i in sorted(indices)]
         corpus = cls(sentences)
 
         return corpus

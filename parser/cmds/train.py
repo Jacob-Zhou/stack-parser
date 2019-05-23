@@ -18,6 +18,8 @@ class Train(object):
         subparser = parser.add_parser(
             name, help='Train a model.'
         )
+        subparser.add_argument('--pos', default=200000, type=int,
+                               help='max num of sentences in fpos to use')
         subparser.add_argument('--buckets', default=64, type=int,
                                help='max num of buckets to use')
         subparser.add_argument('--fpos', default='data/pku/train',
@@ -35,7 +37,7 @@ class Train(object):
 
     def __call__(self, config):
         print("Preprocess the data")
-        tag_train = Corpus.load(config.fpos, columns=[1, 4])
+        tag_train = Corpus.load(config.fpos, columns=[1, 4], length=config.pos)
         dep_train = Corpus.load(config.ftrain)
         dev = Corpus.load(config.fdev)
         test = Corpus.load(config.ftest)
