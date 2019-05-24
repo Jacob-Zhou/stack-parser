@@ -18,7 +18,7 @@ class Train(object):
         subparser = parser.add_parser(
             name, help='Train a model.'
         )
-        subparser.add_argument('--pos', default=200000, type=int,
+        subparser.add_argument('--pos', default=0, type=int,
                                help='max num of sentences in fpos to use')
         subparser.add_argument('--buckets', default=64, type=int,
                                help='max num of buckets to use')
