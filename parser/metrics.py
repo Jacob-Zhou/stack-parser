@@ -40,7 +40,7 @@ class AccuracyMethod(Metric):
         self.total += len(preds)
 
     def __repr__(self):
-        return f"Accuracy: {self.accuracy:.2%}"
+        return f"Acc: {self.accuracy:6.2%}"
 
     @property
     def score(self):
@@ -70,7 +70,7 @@ class AttachmentMethod(Metric):
         self.correct_rels += rel_mask.sum().item()
 
     def __repr__(self):
-        return f"UAS: {self.uas:.2%} LAS: {self.las:.2%}"
+        return f"UAS: {self.uas:6.2%} LAS: {self.las:6.2%}"
 
     @property
     def score(self):
