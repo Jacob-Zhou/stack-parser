@@ -14,16 +14,16 @@ class Model(object):
         self.vocab = vocab
         self.parser = parser
 
-    def train(self, tag_loader, dep_loader):
+    def train(self, pos_loader, dep_loader):
         self.parser.train()
 
-        tag_iter = iter(tag_loader)
         for words, chars, tags, arcs, rels in dep_loader:
             self.optimizer.zero_grad()
-            if self.count == len(tag_loader):
-                self.count, tag_iter = 0, iter(tag_loader)
-            self.count += 1
-            pos_words, pos_chars, pos_tags = next(tag_iter)
+            try:
+                pos_words, pos_chars, pos_tags = next(self.pos_iter)
+            except Exception as e:
+                self.pos_iter = iter(pos_loader)
+                pos_words, pos_chars, pos_tags = next(self.pos_iter)
             mask = pos_words.ne(self.vocab.pad_index)
             # ignore the first token of each sentence
             mask[:, 0] = 0
@@ -50,12 +50,14 @@ class Model(object):
             self.scheduler.step()
 
     @torch.no_grad()
-    def evaluate(self, loader):
+    def evaluate(self, pos_loader, dep_loader):
         self.parser.eval()
 
-        loss, metric_t, metric_p = 0, AccuracyMethod(), AttachmentMethod()
+        pos_loss, dep_loss = 0, 0
+        pos_metric = AccuracyMethod()
+        dep_metric_t, dep_metric_p = AccuracyMethod(), AttachmentMethod()
 
-        for words, chars, tags, arcs, rels in loader:
+        for words, chars, tags, arcs, rels in dep_loader:
             mask = words.ne(self.vocab.pad_index)
             # ignore the first token of each sentence
             mask[:, 0] = 0
@@ -64,14 +66,23 @@ class Model(object):
             gold_tags, pred_tags = tags[mask], s_tag.argmax(dim=-1)
             gold_arcs, gold_rels = arcs[mask], rels[mask]
             pred_arcs, pred_rels = self.parser.decode(s_arc, s_rel)
+            dep_loss += self.parser.get_loss(s_tag, s_arc, s_rel,
+                                             gold_tags, gold_arcs, gold_rels)
+            dep_metric_t(pred_tags, gold_tags)
+            dep_metric_p(pred_arcs, pred_rels, gold_arcs, gold_rels)
+        dep_loss /= len(dep_loader)
 
-            loss += self.parser.get_loss(s_tag, s_arc, s_rel,
-                                         gold_tags, gold_arcs, gold_rels)
-            metric_t(pred_tags, gold_tags)
-            metric_p(pred_arcs, pred_rels, gold_arcs, gold_rels)
-        loss /= len(loader)
-
-        return loss, metric_t, metric_p
+        if pos_loader:
+            for words, chars, tags in pos_loader:
+                mask = words.ne(self.vocab.pad_index)
+                # ignore the first token of each sentence
+                mask[:, 0] = 0
+                s_tag = self.parser(words, chars, False)
+                gold_tags, pred_tags = tags[mask], s_tag.argmax(dim=-1)[mask]
+                pos_loss += self.parser.criterion(s_tag[mask], tags[mask])
+                pos_metric(pred_tags, gold_tags)
+            pos_loss /= len(pos_loader)
+        return pos_loss, dep_loss, pos_metric, dep_metric_t, dep_metric_p
 
     @torch.no_grad()
     def predict(self, loader):

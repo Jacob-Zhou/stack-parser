@@ -20,10 +20,18 @@ class Train(object):
         )
         subparser.add_argument('--pos', default=0, type=int,
                                help='max num of sentences in fpos to use')
+        subparser.add_argument('--pos-batch-size', default=5000, type=int,
+                               help='num of tokens per training update')
+        subparser.add_argument('--patience', default=100, type=int,
+                               help='patience for early stop')
         subparser.add_argument('--buckets', default=64, type=int,
                                help='max num of buckets to use')
-        subparser.add_argument('--fpos', default='data/pku/train',
-                               help='path to pos file')
+        subparser.add_argument('--fptrain', default='data/pku/train',
+                               help='path to pos train file')
+        subparser.add_argument('--fpdev', default='data/pku/dev',
+                               help='path to pos dev file')
+        subparser.add_argument('--fptest', default='data/pku/test',
+                               help='path to pos test file')
         subparser.add_argument('--ftrain', default='data/conll09/train.conllx',
                                help='path to train file')
         subparser.add_argument('--fdev', default='data/conll09/dev.conllx',
@@ -36,17 +44,48 @@ class Train(object):
         return subparser
 
     def __call__(self, config):
-        print("Preprocess the data")
-        tag_train = Corpus.load(config.fpos, columns=[1, 4], length=config.pos)
-        dep_train = Corpus.load(config.ftrain)
-        dev = Corpus.load(config.fdev)
-        test = Corpus.load(config.ftest)
-        if os.path.exists(config.vocab):
-            vocab = torch.load(config.vocab)
-        else:
-            vocab = Vocab.from_corpora(tag_train, dep_train, 2)
+        if config.preprocess:
+            print("Preprocess the corpus")
+            pos_train = Corpus.load(config.fptrain, [1, 4], config.pos)
+            dep_train = Corpus.load(config.ftrain)
+            pos_dev = Corpus.load(config.fpdev, [1, 4])
+            dep_dev = Corpus.load(config.fdev)
+            pos_test = Corpus.load(config.fptest, [1, 4])
+            dep_test = Corpus.load(config.ftest)
+            print("Create the vocab")
+            vocab = Vocab.from_corpora(pos_train, dep_train, 2)
             vocab.read_embeddings(Embedding.load(config.fembed))
+            print("Load the dataset")
+            pos_trainset = TextDataset(vocab.numericalize(pos_train, False),
+                                       config.buckets)
+            dep_trainset = TextDataset(vocab.numericalize(dep_train),
+                                       config.buckets)
+            pos_devset = TextDataset(vocab.numericalize(pos_dev, False),
+                                     config.buckets)
+            dep_devset = TextDataset(vocab.numericalize(dep_dev),
+                                     config.buckets)
+            pos_testset = TextDataset(vocab.numericalize(pos_test, False),
+                                      config.buckets)
+            dep_testset = TextDataset(vocab.numericalize(dep_test),
+                                      config.buckets)
             torch.save(vocab, config.vocab)
+            torch.save(pos_trainset, os.path.join(config.file, 'pos_trainset'))
+            torch.save(dep_trainset, os.path.join(config.file, 'dep_trainset'))
+            torch.save(pos_devset, os.path.join(config.file, 'pos_devset'))
+            torch.save(dep_devset, os.path.join(config.file, 'dep_devset'))
+            torch.save(pos_testset, os.path.join(config.file, 'pos_testset'))
+            torch.save(dep_testset, os.path.join(config.file, 'dep_testset'))
+            return
+
+        print("Load the vocab")
+        vocab = torch.load(config.vocab)
+        print("Load the datasets")
+        pos_trainset = torch.load(os.path.join(config.file, 'pos_trainset'))
+        dep_trainset = torch.load(os.path.join(config.file, 'dep_trainset'))
+        pos_devset = torch.load(os.path.join(config.file, 'pos_devset'))
+        dep_devset = torch.load(os.path.join(config.file, 'dep_devset'))
+        pos_testset = torch.load(os.path.join(config.file, 'pos_testset'))
+        dep_testset = torch.load(os.path.join(config.file, 'dep_testset'))
         config.update({
             'n_words': vocab.n_train_words,
             'n_chars': vocab.n_chars,
@@ -56,37 +95,35 @@ class Train(object):
             'pad_index': vocab.pad_index,
             'unk_index': vocab.unk_index
         })
-        print(vocab)
-
-        print("Load the dataset")
-        tag_trainset = TextDataset(vocab.numericalize(tag_train, False))
-        dep_trainset = TextDataset(vocab.numericalize(dep_train))
-        devset = TextDataset(vocab.numericalize(dev))
-        testset = TextDataset(vocab.numericalize(test))
-        print(f"Set the data loaders")
         # set the data loaders
-        tag_train_loader = batchify(dataset=tag_trainset,
+        pos_train_loader = batchify(dataset=pos_trainset,
                                     batch_size=config.pos_batch_size,
-                                    n_buckets=config.buckets,
                                     shuffle=True)
         dep_train_loader = batchify(dataset=dep_trainset,
                                     batch_size=config.batch_size,
-                                    n_buckets=config.buckets,
                                     shuffle=True)
-        dev_loader = batchify(dataset=devset,
-                              batch_size=config.batch_size,
-                              n_buckets=config.buckets)
-        test_loader = batchify(dataset=testset,
-                               batch_size=config.batch_size,
-                               n_buckets=config.buckets)
-        print(f"{'tag_train:':10} {len(tag_trainset):7} sentences in total, "
-              f"{len(tag_train_loader):4} batches provided")
+        pos_dev_loader = batchify(dataset=pos_devset,
+                                  batch_size=config.pos_batch_size)
+        dep_dev_loader = batchify(dataset=dep_devset,
+                                  batch_size=config.batch_size)
+        pos_test_loader = batchify(dataset=pos_testset,
+                                   batch_size=config.pos_batch_size)
+        dep_test_loader = batchify(dataset=dep_testset,
+                                   batch_size=config.batch_size)
+
+        print(vocab)
+        print(f"{'pos_train:':10} {len(pos_trainset):7} sentences in total, "
+              f"{len(pos_train_loader):4} batches provided")
         print(f"{'dep_train:':10} {len(dep_trainset):7} sentences in total, "
               f"{len(dep_train_loader):4} batches provided")
-        print(f"{'dev:':10} {len(devset):7} sentences in total, "
-              f"{len(dev_loader):4} batches provided")
-        print(f"{'test:':10} {len(testset):7} sentences in total, "
-              f"{len(test_loader):4} batches provided")
+        print(f"{'pos_dev:':10} {len(pos_devset):7} sentences in total, "
+              f"{len(pos_dev_loader):4} batches provided")
+        print(f"{'dep_dev:':10} {len(dep_devset):7} sentences in total, "
+              f"{len(dep_dev_loader):4} batches provided")
+        print(f"{'pos_test:':10} {len(pos_testset):7} sentences in total, "
+              f"{len(pos_test_loader):4} batches provided")
+        print(f"{'dep_test:':10} {len(dep_testset):7} sentences in total, "
+              f"{len(dep_test_loader):4} batches provided")
 
         print("Create the model")
         parser = BiaffineParser(config, vocab.embeddings)
@@ -104,24 +141,26 @@ class Train(object):
                                config.epsilon)
         model.scheduler = ExponentialLR(model.optimizer,
                                         config.decay ** (1 / config.steps))
-        model.count = 0
 
         for epoch in range(1, config.epochs + 1):
             start = datetime.now()
             # train one epoch and update the parameters
-            model.train(tag_train_loader, dep_train_loader)
+            model.train(pos_train_loader, dep_train_loader)
             print(f"Epoch {epoch} / {config.epochs}:")
-            loss, metric_t, metric_p = model.evaluate(dep_train_loader)
-            print(f"{'train:':6} Loss: {loss:.4f} {metric_t} {metric_p}")
-            loss, dev_metric_t, dev_metric_p = model.evaluate(dev_loader)
-            print(f"{'dev:':6} Loss: {loss:.4f} {dev_metric_t} {dev_metric_p}")
-            loss, metric_t, metric_p = model.evaluate(test_loader)
-            print(f"{'test:':6} Loss: {loss:.4f} {metric_t} {metric_p}")
+            lp, ld, mp, mdt, mdp = model.evaluate(None,
+                                                  dep_train_loader)
+            print(f"{'train:':6} LP: {lp:.4f} LD: {ld:.4f} {mp} {mdt} {mdp}")
+            lp, ld, mp, mdt, dev_m = model.evaluate(pos_dev_loader,
+                                                    dep_dev_loader)
+            print(f"{'dev:':6} LP: {lp:.4f} LD: {ld:.4f} {mp} {mdt} {dev_m}")
+            lp, ld, mp, mdt, mdp = model.evaluate(pos_test_loader,
+                                                  dep_test_loader)
+            print(f"{'test:':6} LP: {lp:.4f} LD: {ld:.4f} {mp} {mdt} {mdp}")
 
             t = datetime.now() - start
             # save the model if it is the best so far
-            if dev_metric_p > best_metric and epoch > config.patience:
-                best_e, best_metric = epoch, dev_metric_p
+            if dev_m > best_metric and epoch > config.patience:
+                best_e, best_metric = epoch, dev_m
                 model.parser.save(config.model)
                 print(f"{t}s elapsed (saved)\n")
             else:
@@ -130,9 +169,9 @@ class Train(object):
             if epoch - best_e >= config.patience:
                 break
         model.parser = BiaffineParser.load(config.model)
-        loss, metric_t, metric_p = model.evaluate(test_loader)
+        lp, ld, mp, mdt, mdp = model.evaluate(pos_test_loader, dep_test_loader)
 
         print(f"max score of dev is {best_metric.score:.2%} at epoch {best_e}")
-        print(f"the score of test at epoch {best_e} is {metric_p.score:.2%}")
+        print(f"the score of test at epoch {best_e} is {mdp.score:.2%}")
         print(f"average time of each epoch is {total_time / epoch}s")
         print(f"{total_time}s elapsed")
