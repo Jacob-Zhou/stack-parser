@@ -20,7 +20,7 @@ class Train(object):
         )
         subparser.add_argument('--pos', default=0, type=int,
                                help='max num of sentences in fpos to use')
-        subparser.add_argument('--pos-batch-size', default=5000, type=int,
+        subparser.add_argument('--pos-batch-size', default=10000, type=int,
                                help='num of tokens per training update')
         subparser.add_argument('--patience', default=100, type=int,
                                help='patience for early stop')
