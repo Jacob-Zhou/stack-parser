@@ -21,7 +21,7 @@ class Model(object):
             self.optimizer.zero_grad()
             try:
                 pos_words, pos_chars, pos_tags = next(self.pos_iter)
-            except Exception as e:
+            except Exception:
                 self.pos_iter = iter(pos_loader)
                 pos_words, pos_chars, pos_tags = next(self.pos_iter)
             mask = pos_words.ne(self.vocab.pad_index)
