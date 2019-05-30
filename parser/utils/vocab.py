@@ -73,7 +73,7 @@ class Vocab(object):
                              for rel in sequence])
 
     def id2tag(self, ids):
-        return [self.tags[i] for i in ids]
+        return [self.dep_tags[i] for i in ids]
 
     def id2rel(self, ids):
         return [self.rels[i] for i in ids]

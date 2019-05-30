@@ -15,7 +15,7 @@ class Predict(object):
         )
         subparser.add_argument('--batch-size', default=5000, type=int,
                                help='batch size')
-        subparser.add_argument('--fdata', default='data/test.gold.conllx',
+        subparser.add_argument('--fdata', default='data/conll09/test.conllx',
                                help='path to dataset')
         subparser.add_argument('--fpred', default='pred.conllx',
                                help='path to predicted result')
@@ -30,12 +30,12 @@ class Predict(object):
 
         print("Load the dataset")
         corpus = Corpus.load(config.fdata)
-        dataset = TextDataset(vocab.numericalize(corpus, False))
+        dataset = TextDataset(vocab.numericalize(corpus, True, False))
         # set the data loader
         loader = batchify(dataset, config.batch_size)
 
         print("Make predictions on the dataset")
-        corpus.heads, corpus.rels = model.predict(loader)
+        corpus.tags, corpus.heads, corpus.rels = model.predict(loader)
 
         print(f"Save the predicted result to {config.fpred}")
         corpus.save(config.fpred)

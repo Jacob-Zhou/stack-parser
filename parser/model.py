@@ -88,7 +88,7 @@ class Model(object):
     def predict(self, loader):
         self.parser.eval()
 
-        all_arcs, all_rels = [], []
+        all_tags, all_arcs, all_rels = [], [], []
         for words, chars in loader:
             mask = words.ne(self.vocab.pad_index)
             # ignore the first token of each sentence
@@ -96,11 +96,14 @@ class Model(object):
             lens = mask.sum(dim=1).tolist()
             s_tag, s_arc, s_rel = self.parser(words, chars)
             s_tag, s_arc, s_rel = s_tag[mask], s_arc[mask], s_rel[mask]
+            pred_tags = s_tag.argmax(dim=-1)
             pred_arcs, pred_rels = self.parser.decode(s_arc, s_rel)
 
+            all_tags.extend(torch.split(pred_tags, lens))
             all_arcs.extend(torch.split(pred_arcs, lens))
             all_rels.extend(torch.split(pred_rels, lens))
+        all_tags = [self.vocab.id2tag(seq) for seq in all_tags]
         all_arcs = [seq.tolist() for seq in all_arcs]
         all_rels = [self.vocab.id2rel(seq) for seq in all_rels]
 
-        return all_arcs, all_rels
+        return all_tags, all_arcs, all_rels
