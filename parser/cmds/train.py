@@ -6,6 +6,7 @@ from parser import BiaffineParser, Model
 from parser.metrics import AttachmentMethod
 from parser.utils import Corpus, Embedding, Vocab
 from parser.utils.data import TextDataset, batchify
+from parser.utils.optim import NoamLR
 
 import torch
 from torch.optim import Adam

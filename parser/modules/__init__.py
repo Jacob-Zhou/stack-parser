@@ -7,7 +7,8 @@ from .dropout import IndependentDropout, SharedDropout
 from .highway import Highway
 from .mlp import MLP
 from .scalar_mix import ScalarMix
+from .transformer import Transformer
 
 
-__all__ = ['CHAR_LSTM', 'MLP', 'Biaffine', 'BiLSTM', 'Highway',
+__all__ = ['CHAR_LSTM', 'MLP', 'Biaffine', 'BiLSTM', 'Highway', 'Transformer',
            'IndependentDropout', 'ScalarMix', 'SharedDropout']
