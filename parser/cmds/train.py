@@ -2,11 +2,10 @@
 
 import os
 from datetime import datetime, timedelta
-from parser import BiaffineParser, Model
+from parser import JointModel, Model
 from parser.metrics import AttachmentMethod
 from parser.utils import Corpus, Embedding, Vocab
 from parser.utils.data import TextDataset, batchify
-from parser.utils.optim import NoamLR
 
 import torch
 from torch.optim import Adam
@@ -127,21 +126,29 @@ class Train(object):
               f"{len(dep_test_loader):4} batches provided")
 
         print("Create the model")
-        parser = BiaffineParser(config, vocab.embeddings)
+        parser = JointModel(config, vocab.embeddings)
         if torch.cuda.is_available():
             parser = parser.cuda()
         print(f"{parser}\n")
 
         model = Model(vocab, parser)
 
+        print("Create the optimizer")
         total_time = timedelta()
         best_e, best_metric = 1, AttachmentMethod()
-        model.optimizer = Adam(model.parser.parameters(),
-                               config.lr,
-                               (config.mu, config.nu),
-                               config.epsilon)
+        model.optimizer = Adam([
+            {'params': model.parser.pretrained.parameters()},
+            {'params': model.parser.word_embed.parameters()},
+            {'params': model.parser.char_lstm.parameters()},
+            {'params': model.parser.tagger.parameters(),
+             'lr': 1e-3, 'betas': (0.9, 0.98), 'eps': 1e-9}
+        ],
+            config.lr,
+            (config.mu, config.nu),
+            config.epsilon)
         model.scheduler = ExponentialLR(model.optimizer,
                                         config.decay ** (1 / config.steps))
+        print(model.optimizer)
 
         for epoch in range(1, config.epochs + 1):
             start = datetime.now()
@@ -169,7 +176,7 @@ class Train(object):
             total_time += t
             if epoch - best_e >= config.patience:
                 break
-        model.parser = BiaffineParser.load(config.model)
+        model.parser = JointModel.load(config.model)
         lp, ld, mp, mdt, mdp = model.evaluate(pos_test_loader, dep_test_loader)
 
         print(f"max score of dev is {best_metric.score:.2%} at epoch {best_e}")

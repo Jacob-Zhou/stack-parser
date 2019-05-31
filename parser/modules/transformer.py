@@ -18,8 +18,7 @@ class Transformer(nn.Module):
 
         for layer in self.layers:
             x = layer(x, mask)
-
-        return x
+            yield x
 
     @classmethod
     def init_pos(cls, x):

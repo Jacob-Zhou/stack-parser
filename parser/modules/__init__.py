@@ -10,5 +10,5 @@ from .scalar_mix import ScalarMix
 from .transformer import Transformer
 
 
-__all__ = ['CHAR_LSTM', 'MLP', 'Biaffine', 'BiLSTM', 'Highway', 'Transformer',
-           'IndependentDropout', 'ScalarMix', 'SharedDropout']
+__all__ = ['CHAR_LSTM', 'MLP', 'Biaffine', 'BiLSTM', 'Highway',
+           'IndependentDropout', 'ScalarMix', 'SharedDropout', 'Transformer']
