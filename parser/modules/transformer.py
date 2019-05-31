@@ -1,122 +1,144 @@
 # -*- coding: utf-8 -*-
 
-import torch
 import torch.nn as nn
 
 
 class Transformer(nn.Module):
 
-    def __init__(self, L, H, Dk, Dv, Dm, Dh, p=0.2):
+    def __init__(self, n_layers, n_heads, n_model, n_embed, n_inner, p=0.1):
         super(Transformer, self).__init__()
 
-        self.layers = nn.ModuleList([
-            Layer(H, Dk, Dv, Dm, Dh, p) for _ in range(L)
-        ])
-        self.drop = nn.Dropout(p)
-
-    def init_pos(self, T, N):
-        embed = torch.tensor([
-            [pos / 10000 ** (i // 2 * 2 / N)
-             for i in range(N)] for pos in range(T)
-        ])
-        embed[:, 0::2] = torch.sin(embed[:, 0::2])
-        embed[:, 1::2] = torch.cos(embed[:, 1::2])
-
-        return embed
+        self.layers = nn.ModuleList([Layer(n_heads, n_model, n_embed, n_inner)
+                                     for _ in range(n_layers)])
+        self.dropout = nn.Dropout(p)
 
     def forward(self, x, mask):
-        B, T, N = x.shape
+        x += self.init_pos(x)
+        x = self.dropout(x)
 
-        x += self.init_pos(T, N)
-
-        out = self.drop(x)
         for layer in self.layers:
-            out = layer(out, mask)
+            x = layer(x, mask)
 
-        return out
+        return x
+
+    @classmethod
+    def init_pos(cls, x):
+        seq_len, n_model = x[0].shape
+        pos = x.new_tensor(range(seq_len)).unsqueeze(-1)
+        pos = pos / 10000 ** (x.new_tensor(range(n_model)) // 2 * 2 / n_model)
+        pos[:, 0::2] = pos[:, 0::2].sin()
+        pos[:, 1::2] = pos[:, 1::2].cos()
+        pos = pos.unsqueeze(0).expand_as(x)
+
+        return pos
 
 
 class Layer(nn.Module):
 
-    def __init__(self, H, Dk, Dv, Dm, Dh, p=0.2):
+    def __init__(self, n_heads, n_model, n_embed, n_inner,
+                 attn_dropout=0.1, pos_dropout=0.1):
         super(Layer, self).__init__()
 
-        self.attn = MultiheadAttention(H, Dk, Dv, Dm, p)
-        self.ffn = PosWiseFFN(Dm, Dh, p)
+        self.attn = MultiHeadAttention(n_heads, n_model, n_embed, attn_dropout)
+        self.ffn = PosWiseFFN(n_model, n_inner, pos_dropout)
 
     def forward(self, x, mask):
-        out = self.attn(x, x, x, mask)
-        out = self.ffn(out)
+        x = self.attn(x, x, x, mask)
+        x = self.ffn(x)
 
-        return out
+        return x
 
 
-class MultiheadAttention(nn.Module):
+class ScaledDotProductAttention(nn.Module):
 
-    def __init__(self, H, Dk, Dv, Dm, p=0.2):
-        super(MultiheadAttention, self).__init__()
+    def __init__(self, scale, dropout=0.1):
+        super(ScaledDotProductAttention, self).__init__()
 
-        self.H = H
-        self.Dk = Dk
-        self.Dv = Dv
-        self.scale = Dk ** 0.5
-
-        self.wq = nn.Parameter(torch.Tensor(H, Dm, Dk))
-        self.wk = nn.Parameter(torch.Tensor(H, Dm, Dk))
-        self.wv = nn.Parameter(torch.Tensor(H, Dm, Dv))
-
+        self.scale = scale
+        self.dropout = nn.Dropout(dropout)
         self.softmax = nn.Softmax(dim=-1)
-        self.proj = nn.Linear(H * Dv, Dm)
-        self.norm = nn.LayerNorm(Dm)
-        self.drop = nn.Dropout(p)
+
+    def forward(self, q, k, v, mask):
+        attn = (q @ k.transpose(-1, -2)) / self.scale
+        attn = attn.masked_fill_(~mask.unsqueeze(1), float('-inf'))
+        attn = self.softmax(attn)
+        attn = self.dropout(attn)
+        x = attn @ v
+
+        return x
+
+
+class MultiHeadAttention(nn.Module):
+
+    def __init__(self, n_heads, n_model, n_embed, dropout=0.1):
+        super(MultiHeadAttention, self).__init__()
+
+        self.n_heads = n_heads
+        self.n_model = n_model
+        self.n_embed = n_embed
+
+        self.wq = nn.Linear(n_model, n_heads*n_embed, False)
+        self.wk = nn.Linear(n_model, n_heads*n_embed, False)
+        self.wv = nn.Linear(n_model, n_heads*n_embed, False)
+        self.attn = ScaledDotProductAttention(n_embed**0.5, dropout)
+        self.layer_norm = nn.LayerNorm(n_model)
+        self.wo = nn.Linear(n_heads*n_embed, n_model, False)
+        self.dropout = nn.Dropout(dropout)
 
         self.reset_parameters()
 
     def reset_parameters(self):
-        nn.init.xavier_normal_(self.wq)
-        nn.init.xavier_normal_(self.wk)
-        nn.init.xavier_normal_(self.wv)
+        nn.init.xavier_normal_(self.wq.weight)
+        nn.init.xavier_normal_(self.wk.weight)
+        nn.init.xavier_normal_(self.wv.weight)
 
     def forward(self, q, k, v, mask):
         residual = q
-        B, Tq, Dm = q.shape
-        B, Tk, Dm = k.shape
-        B, Tv, Dm = v.shape
-        H, Dk, Dv = self.H, self.Dk, self.Dv
+        batch_size, seq_len, _ = q.shape
 
-        q = (q @ self.wq.unsqueeze(1)).view(-1, Tq, Dk)  # [H * B, Tq, Dk]
-        k = (k @ self.wk.unsqueeze(1)).view(-1, Tk, Dk)  # [H * B, Tk, Dk]
-        v = (v @ self.wv.unsqueeze(1)).view(-1, Tv, Dv)  # [H * B, Tv, Dv]
+        # [batch_size, seq_len, n_heads, n_embed]
+        q = self.wq(q).view(batch_size, seq_len, self.n_heads, -1)
+        # [batch_size, seq_len, n_heads, n_embed]
+        k = self.wk(k).view(batch_size, seq_len, self.n_heads, -1)
+        # [batch_size, seq_len, n_heads, n_embed]
+        v = self.wv(v).view(batch_size, seq_len, self.n_heads, -1)
+        # [n_heads * batch_size, seq_len, n_embed]
+        q = q.permute(2, 0, 1, 3).reshape(-1, seq_len, self.n_embed)
+        # [n_heads * batch_size, seq_len, n_embed]
+        k = k.permute(2, 0, 1, 3).reshape(-1, seq_len, self.n_embed)
+        # [n_heads * batch_size, seq_len, n_embed]
+        v = v.permute(2, 0, 1, 3).reshape(-1, seq_len, self.n_embed)
 
-        # Scaled Dot-Product Attention
-        mask = mask.repeat(H, 1).unsqueeze(1)  # [H * B, 1, Tk]
-        attn = (q @ k.transpose(1, 2)) / self.scale  # [H * B, Tq, Tk]
-        attn = attn.masked_fill(~mask, -float('-inf'))
-        attn = self.softmax(attn)
-        attn = self.drop(attn)
+        # [n_heads * batch_size, seq_len, n_embed]
+        x = self.attn(q, k, v, mask.repeat(self.n_heads, 1))
+        x = x.view(self.n_heads, batch_size, seq_len, self.n_embed)
+        # [batch_size, seq_len, n_heads * n_embed]
+        x = x.permute(1, 2, 0, 3).reshape(batch_size, seq_len, -1)
+        # [batch_size, seq_len, n_model]
+        x = self.wo(x)
+        x = self.dropout(x)
+        x = self.layer_norm(x + residual)
 
-        out = attn @ v  # [H * B, Tq, Dv]
-        out = torch.cat(torch.split(out, B, dim=0), dim=-1)  # [B, Tq, H * Dv]
-        out = self.proj(out)  # [B, Tq, Dm]
-        out = self.drop(out)
-
-        return self.norm(out + residual)
+        return x
 
 
 class PosWiseFFN(nn.Module):
 
-    def __init__(self, Dm, Dh, p=0.2):
+    def __init__(self, n_model, n_inner, p=0.1):
         super(PosWiseFFN, self).__init__()
 
-        self.w1 = nn.Sequential(nn.Linear(Dm, Dh), nn.ReLU())
-        self.w2 = nn.Linear(Dh, Dm)
-        self.norm = nn.LayerNorm(Dm)
-        self.drop = nn.Dropout(p)
+        self.w1 = nn.Linear(n_model, n_inner)
+        self.activation = nn.ReLU()
+        self.w2 = nn.Linear(n_inner, n_model)
+        self.layer_norm = nn.LayerNorm(n_model)
+        self.dropout = nn.Dropout(p)
 
     def forward(self, x):
         residual = x
         x = self.w1(x)
+        x = self.activation(x)
         x = self.w2(x)
-        x = self.drop(x)
+        x = self.dropout(x)
+        x = self.layer_norm(x + residual)
 
-        return self.norm(x + residual)
+        return x
