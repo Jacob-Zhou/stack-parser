@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from .model import Model
-from .parser import JointModel
+from .parser import BiaffineParser
 
 
-__all__ = ['JointModel', 'Model']
+__all__ = ['BiaffineParser', 'Model']
