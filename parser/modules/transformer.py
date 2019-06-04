@@ -5,20 +5,25 @@ import torch.nn as nn
 
 class Transformer(nn.Module):
 
-    def __init__(self, n_layers, n_heads, n_model, n_embed, n_inner, p=0.1):
+    def __init__(self, n_layers, n_heads, n_model, n_embed, n_inner,
+                 input_dropout=0.1, attn_dropout=0.1, ffn_dropout=0.1):
         super(Transformer, self).__init__()
 
-        self.layers = nn.ModuleList([Layer(n_heads, n_model, n_embed, n_inner)
+        self.layers = nn.ModuleList([Layer(n_heads, n_model, n_embed, n_inner,
+                                           attn_dropout, ffn_dropout)
                                      for _ in range(n_layers)])
-        self.dropout = nn.Dropout(p)
+        self.layer_norm = nn.LayerNorm(n_model)
+        self.dropout = nn.Dropout(input_dropout)
 
     def forward(self, x, mask):
         x += self.init_pos(x)
+        x = self.layer_norm(x)
         x = self.dropout(x)
 
         for layer in self.layers:
             x = layer(x, mask)
-            yield x
+
+        return x
 
     @classmethod
     def init_pos(cls, x):
@@ -35,11 +40,11 @@ class Transformer(nn.Module):
 class Layer(nn.Module):
 
     def __init__(self, n_heads, n_model, n_embed, n_inner,
-                 attn_dropout=0.1, pos_dropout=0.1):
+                 attn_dropout=0.1, ffn_dropout=0.1):
         super(Layer, self).__init__()
 
         self.attn = MultiHeadAttention(n_heads, n_model, n_embed, attn_dropout)
-        self.ffn = PosWiseFFN(n_model, n_inner, pos_dropout)
+        self.ffn = PosWiseFFN(n_model, n_inner, ffn_dropout)
 
     def forward(self, x, mask):
         x = self.attn(x, x, x, mask)
@@ -87,9 +92,9 @@ class MultiHeadAttention(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        nn.init.xavier_normal_(self.wq.weight)
-        nn.init.xavier_normal_(self.wk.weight)
-        nn.init.xavier_normal_(self.wv.weight)
+        nn.init.orthogonal_(self.wq.weight)
+        nn.init.orthogonal_(self.wk.weight)
+        nn.init.orthogonal_(self.wv.weight)
 
     def forward(self, q, k, v, mask):
         residual = q
@@ -132,10 +137,19 @@ class PosWiseFFN(nn.Module):
         self.layer_norm = nn.LayerNorm(n_model)
         self.dropout = nn.Dropout(p)
 
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        nn.init.orthogonal_(self.w1.weight)
+        nn.init.orthogonal_(self.w2.weight)
+        nn.init.zeros_(self.w1.bias)
+        nn.init.zeros_(self.w2.bias)
+
     def forward(self, x):
         residual = x
         x = self.w1(x)
         x = self.activation(x)
+        x = self.dropout(x)
         x = self.w2(x)
         x = self.dropout(x)
         x = self.layer_norm(x + residual)
