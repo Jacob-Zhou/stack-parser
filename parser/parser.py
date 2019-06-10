@@ -26,11 +26,14 @@ class BiaffineParser(nn.Module):
         self.embed_dropout = IndependentDropout(p=config.embed_dropout)
 
         # the word-lstm layer
-        self.lstm = BiLSTM(input_size=config.n_embed*2,
-                           hidden_size=config.n_lstm_hidden,
-                           num_layers=config.n_lstm_layers,
-                           dropout=config.lstm_dropout)
-        self.mix = ScalarMix(config.n_lstm_layers)
+        self.tag_lstm = BiLSTM(input_size=config.n_embed*2,
+                               hidden_size=config.n_lstm_hidden,
+                               num_layers=config.n_lstm_layers,
+                               dropout=config.lstm_dropout)
+        self.dep_lstm = BiLSTM(input_size=config.n_embed*2,
+                               hidden_size=config.n_lstm_hidden,
+                               num_layers=config.n_lstm_layers,
+                               dropout=config.lstm_dropout)
         self.lstm_dropout = SharedDropout(p=config.lstm_dropout)
 
         # the MLP layers
@@ -93,16 +96,22 @@ class BiaffineParser(nn.Module):
 
         sorted_lens, indices = torch.sort(lens, descending=True)
         inverse_indices = indices.argsort()
-        x = pack_padded_sequence(x[indices], sorted_lens, True)
-        x = [pad_packed_sequence(i, True)[0] for i in self.lstm(x)]
-        x_tag = self.lstm_dropout(self.mix(x))[inverse_indices]
-        x_dep = self.lstm_dropout(x[-1])[inverse_indices]
+        x_tag = pack_padded_sequence(x[indices], sorted_lens, True)
+        x_tag = self.tag_lstm(x_tag)[-1]
+        x_tag, _ = pad_packed_sequence(x_tag, True)
+        x_tag = self.lstm_dropout(x_tag)[inverse_indices]
         x_tag = self.mlp_tag(x_tag)
 
         if not dep:
             return self.ffn_pos_tag(x_tag)
         else:
             s_tag = self.ffn_dep_tag(x_tag)
+
+        x_dep = pack_padded_sequence(x[indices], sorted_lens, True)
+        x_dep = self.dep_lstm(x_dep)[-1]
+        x_dep, _ = pad_packed_sequence(x_dep, True)
+        x_dep = self.lstm_dropout(x_dep)[inverse_indices]
+
         # apply MLPs to the BiLSTM output states
         arc_h = self.mlp_arc_h(x_dep)
         arc_d = self.mlp_arc_d(x_dep)
