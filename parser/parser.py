@@ -42,7 +42,7 @@ class BiaffineParser(nn.Module):
                            dropout=0.5)
         self.mlp_dep = MLP(n_in=config.n_lstm_hidden*2,
                            n_hidden=config.n_mlp_arc,
-                           dropout=0.5)
+                           dropout=config.mlp_dropout)
         self.mlp_arc_h = MLP(n_in=config.n_lstm_hidden*2,
                              n_hidden=config.n_mlp_arc,
                              dropout=config.mlp_dropout)
