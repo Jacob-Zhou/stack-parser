@@ -126,7 +126,7 @@ class Train(object):
               f"{len(dep_test_loader):4} batches provided")
 
         print("Create the model")
-        parser = BiaffineParser(config, vocab.embeddings)
+        parser = BiaffineParser(config, vocab.embed)
         if torch.cuda.is_available():
             parser = parser.cuda()
         print(f"{parser}\n")

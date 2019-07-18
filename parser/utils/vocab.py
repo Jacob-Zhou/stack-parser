@@ -7,15 +7,15 @@ import torch
 
 
 class Vocab(object):
-    PAD = '<PAD>'
-    UNK = '<UNK>'
+    pad = '<PAD>'
+    unk = '<UNK>'
 
     def __init__(self, words, chars, pos_tags, dep_tags, rels):
         self.pad_index = 0
         self.unk_index = 1
 
-        self.words = [self.PAD, self.UNK] + sorted(words)
-        self.chars = [self.PAD, self.UNK] + sorted(chars)
+        self.words = [self.pad, self.unk] + sorted(words)
+        self.chars = [self.pad, self.unk] + sorted(chars)
         self.pos_tags = sorted(pos_tags)
         self.dep_tags = sorted(dep_tags)
         self.rels = sorted(rels)
@@ -79,19 +79,18 @@ class Vocab(object):
         return [self.rels[i] for i in ids]
 
     def read_embeddings(self, embed, smooth=True):
-        # if the UNK token has existed in the pretrained,
-        # then use it to replace the one in the vocab
+        words = list(embed.tokens)
+        # if the `unk` token has existed in the pretrained,
+        # then replace it with a self-defined one
         if embed.unk:
-            self.UNK = embed.unk
+            words[embed.unk_index] = self.unk
 
-        self.extend(embed.tokens)
-        self.embeddings = torch.zeros(self.n_words, embed.dim)
+        self.extend(words)
+        self.embed = torch.zeros(self.n_words, embed.dim)
+        self.embed[self.word2id(words)] = embed.vectors
 
-        for i, word in enumerate(self.words):
-            if word in embed:
-                self.embeddings[i] = embed[word]
         if smooth:
-            self.embeddings /= torch.std(self.embeddings)
+            self.embed /= torch.std(self.embed)
 
     def extend(self, words):
         self.words += sorted(set(words).difference(self.word_dict))
