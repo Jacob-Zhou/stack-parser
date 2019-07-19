@@ -101,7 +101,9 @@ class BiaffineParser(nn.Module):
             x_tag = self.lstm_dropout(self.tag_mix(x))[inverse_indices]
         else:
             x = pad_packed_sequence(self.lstm(x)[-1], True)[0]
-            x_tag = self.lstm_dropout(x)[inverse_indices]
+            x = self.lstm_dropout(x)[inverse_indices]
+            x_tag = x
+        x_tag = self.mlp_tag(x_tag)
 
         if not dep:
             return self.ffn_pos_tag(x_tag)
@@ -109,7 +111,7 @@ class BiaffineParser(nn.Module):
         if self.weight:
             x_dep = self.lstm_dropout(self.dep_mix(x))[inverse_indices]
         else:
-            x_dep = x_tag
+            x_dep = x
 
         # apply MLPs to the BiLSTM output states
         arc_h = self.mlp_arc_h(x_dep)
