@@ -18,7 +18,7 @@ class Model(object):
     def train(self, pos_loader, dep_loader):
         self.parser.train()
 
-        for i, (words, chars, tags, arcs, rels) in enumerate(pos_loader):
+        for i, (words, chars, tags, arcs, rels) in enumerate(dep_loader):
             try:
                 pos_words, pos_chars, pos_tags = next(self.pos_iter)
             except Exception:
