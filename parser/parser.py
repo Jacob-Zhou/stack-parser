@@ -64,6 +64,7 @@ class BiaffineParser(nn.Module):
                                  n_out=config.n_rels,
                                  bias_x=True,
                                  bias_y=True)
+        self.weight = config.weight
         self.pad_index = config.pad_index
         self.unk_index = config.unk_index
         self.criterion = nn.CrossEntropyLoss()
