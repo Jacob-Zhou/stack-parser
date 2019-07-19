@@ -40,6 +40,8 @@ class Train(object):
                                help='path to test file')
         subparser.add_argument('--fembed', default='data/giga.100.txt',
                                help='path to pretrained embedding file')
+        subparser.add_argument('--weight', action='store_true',
+                               help='whether to weighted sum the layers')
 
         return subparser
 
@@ -96,20 +98,20 @@ class Train(object):
             'unk_index': vocab.unk_index
         })
         # set the data loaders
-        pos_train_loader = batchify(dataset=pos_trainset,
-                                    batch_size=config.pos_batch_size,
-                                    shuffle=True)
-        dep_train_loader = batchify(dataset=dep_trainset,
-                                    batch_size=config.batch_size,
-                                    shuffle=True)
-        pos_dev_loader = batchify(dataset=pos_devset,
-                                  batch_size=config.pos_batch_size)
-        dep_dev_loader = batchify(dataset=dep_devset,
-                                  batch_size=config.batch_size)
-        pos_test_loader = batchify(dataset=pos_testset,
-                                   batch_size=config.pos_batch_size)
-        dep_test_loader = batchify(dataset=dep_testset,
-                                   batch_size=config.batch_size)
+        pos_train_loader = batchify(pos_trainset,
+                                    config.pos_batch_size//config.update_steps,
+                                    True)
+        dep_train_loader = batchify(dep_trainset,
+                                    config.batch_size//config.update_steps,
+                                    True)
+        pos_dev_loader = batchify(pos_devset,
+                                  config.pos_batch_size)
+        dep_dev_loader = batchify(dep_devset,
+                                  config.batch_size)
+        pos_test_loader = batchify(pos_testset,
+                                   config.pos_batch_size)
+        dep_test_loader = batchify(dep_testset,
+                                   config.batch_size)
 
         print(vocab)
         print(f"{'pos_train:':10} {len(pos_trainset):7} sentences in total, "
@@ -126,12 +128,10 @@ class Train(object):
               f"{len(dep_test_loader):4} batches provided")
 
         print("Create the model")
-        parser = BiaffineParser(config, vocab.embed)
-        if torch.cuda.is_available():
-            parser = parser.cuda()
+        parser = BiaffineParser(config, vocab.embed).to(config.device)
         print(f"{parser}\n")
 
-        model = Model(vocab, parser)
+        model = Model(config, vocab, parser)
 
         total_time = timedelta()
         best_e, best_metric = 1, AttachmentMethod()
@@ -140,7 +140,7 @@ class Train(object):
                                (config.mu, config.nu),
                                config.epsilon)
         model.scheduler = ExponentialLR(model.optimizer,
-                                        config.decay ** (1 / config.steps))
+                                        config.decay**(1/config.decay_steps))
 
         for epoch in range(1, config.epochs + 1):
             start = datetime.now()

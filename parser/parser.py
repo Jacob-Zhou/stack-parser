@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from parser.modules import (CHAR_LSTM, MLP, Biaffine, BiLSTM,
-                            IndependentDropout, SharedDropout)
+                            IndependentDropout, ScalarMix, SharedDropout)
 
 import torch
 import torch.nn as nn
@@ -30,6 +30,9 @@ class BiaffineParser(nn.Module):
                            hidden_size=config.n_lstm_hidden,
                            num_layers=config.n_lstm_layers,
                            dropout=config.lstm_dropout)
+        if config.weight:
+            self.tag_mix = ScalarMix(config.n_lstm_layers)
+            self.dep_mix = ScalarMix(config.n_lstm_layers)
         self.lstm_dropout = SharedDropout(p=config.lstm_dropout)
 
         # the MLP layers
@@ -93,19 +96,26 @@ class BiaffineParser(nn.Module):
         sorted_lens, indices = torch.sort(lens, descending=True)
         inverse_indices = indices.argsort()
         x = pack_padded_sequence(x[indices], sorted_lens, True)
-        x = self.lstm(x)[-1]
-        x, _ = pad_packed_sequence(x, True)
-        x = self.lstm_dropout(x)[inverse_indices]
-        x_tag = self.mlp_tag(x)
+        if self.weight:
+            x = [pad_packed_sequence(i, True)[0] for i in self.lstm(x)]
+            x_tag = self.lstm_dropout(self.tag_mix(x))[inverse_indices]
+        else:
+            x = pad_packed_sequence(self.lstm(x)[-1], True)[0]
+            x_tag = self.lstm_dropout(x)[inverse_indices]
 
         if not dep:
             return self.ffn_pos_tag(x_tag)
 
+        if self.weight:
+            x_dep = self.lstm_dropout(self.dep_mix(x))[inverse_indices]
+        else:
+            x_dep = x_tag
+
         # apply MLPs to the BiLSTM output states
-        arc_h = self.mlp_arc_h(x)
-        arc_d = self.mlp_arc_d(x)
-        rel_h = self.mlp_rel_h(x)
-        rel_d = self.mlp_rel_d(x)
+        arc_h = self.mlp_arc_h(x_dep)
+        arc_d = self.mlp_arc_d(x_dep)
+        rel_h = self.mlp_rel_h(x_dep)
+        rel_d = self.mlp_rel_d(x_dep)
 
         s_tag = self.ffn_dep_tag(x_tag)
         # get arc and rel scores from the bilinear attention
@@ -120,10 +130,7 @@ class BiaffineParser(nn.Module):
 
     @classmethod
     def load(cls, fname):
-        if torch.cuda.is_available():
-            device = torch.device('cuda')
-        else:
-            device = torch.device('cpu')
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
         state = torch.load(fname, map_location=device)
         parser = cls(state['config'], state['embed'])
         parser.load_state_dict(state['state_dict'])
@@ -131,30 +138,11 @@ class BiaffineParser(nn.Module):
 
         return parser
 
-    @classmethod
-    def load_checkpoint(cls, fname):
-        if torch.cuda.is_available():
-            device = torch.device('cuda')
-        else:
-            device = torch.device('cpu')
-        state = torch.load(fname, map_location=device)
-
-        return state
-
     def save(self, fname):
         state = {
             'config': self.config,
             'embed': self.pretrained.weight,
             'state_dict': self.state_dict()
-        }
-        torch.save(state, fname)
-
-    def save_checkpoint(self, fname, epoch, optimizer, scheduler):
-        state = {
-            'epoch': epoch,
-            'state_dict': self.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            'scheduler_state_dict': scheduler.state_dict()
         }
         torch.save(state, fname)
 

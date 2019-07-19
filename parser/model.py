@@ -8,17 +8,17 @@ import torch.nn as nn
 
 class Model(object):
 
-    def __init__(self, vocab, parser):
+    def __init__(self, config, vocab, parser):
         super(Model, self).__init__()
 
+        self.config = config
         self.vocab = vocab
         self.parser = parser
 
     def train(self, pos_loader, dep_loader):
         self.parser.train()
 
-        for words, chars, tags, arcs, rels in dep_loader:
-            self.optimizer.zero_grad()
+        for i, (words, chars, tags, arcs, rels) in enumerate(pos_loader):
             try:
                 pos_words, pos_chars, pos_tags = next(self.pos_iter)
             except Exception:
@@ -29,6 +29,7 @@ class Model(object):
             mask[:, 0] = 0
             s_tag = self.parser(pos_words, pos_chars, False)
             loss = self.parser.criterion(s_tag[mask], pos_tags[mask])
+            loss /= self.config.update_steps
             loss.backward()
 
             mask = words.ne(self.vocab.pad_index)
@@ -41,10 +42,14 @@ class Model(object):
 
             loss = self.parser.get_loss(s_tag, s_arc, s_rel,
                                         gold_tags, gold_arcs, gold_rels)
+            loss /= self.config.update_steps
             loss.backward()
-            nn.utils.clip_grad_norm_(self.parser.parameters(), 5.0)
-            self.optimizer.step()
-            self.scheduler.step()
+            if (i + 1) % self.config.update_steps == 0:
+                nn.utils.clip_grad_norm_(self.parser.parameters(),
+                                         self.config.clip)
+                self.optimizer.step()
+                self.scheduler.step()
+                self.optimizer.zero_grad()
 
     @torch.no_grad()
     def evaluate(self, pos_loader, dep_loader):
