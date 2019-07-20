@@ -29,7 +29,7 @@ class BiaffineParser(nn.Module):
                                hidden_size=config.n_lstm_hidden,
                                num_layers=config.n_lstm_layers,
                                dropout=config.lstm_dropout)
-        self.dep_lstm = BiLSTM(input_size=config.n_embed*2+500,
+        self.dep_lstm = BiLSTM(input_size=config.n_embed*2+config.n_mlp_arc,
                                hidden_size=config.n_lstm_hidden,
                                num_layers=config.n_lstm_layers,
                                dropout=config.lstm_dropout)
