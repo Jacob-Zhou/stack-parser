@@ -17,7 +17,7 @@ class ScalarMix(nn.Module):
     def extra_repr(self):
         return f"n_layers={self.n_layers}"
 
-    def forward(self, tensors, mask=None):
+    def forward(self, tensors):
         normed_weights = self.weights.softmax(dim=0)
         weighted_sum = sum(w * h for w, h in zip(normed_weights, tensors))
 

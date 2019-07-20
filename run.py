@@ -3,11 +3,9 @@
 import argparse
 import os
 from parser.cmds import Evaluate, Predict, Train
+from parser.config import Config
 
 import torch
-
-from config import Config
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
