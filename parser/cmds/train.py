@@ -89,7 +89,7 @@ class Train(object):
         pos_testset = torch.load(os.path.join(config.file, 'pos_testset'))
         dep_testset = torch.load(os.path.join(config.file, 'dep_testset'))
         config.update({
-            'n_words': vocab.n_train_words,
+            'n_words': vocab.n_init,
             'n_chars': vocab.n_chars,
             'n_pos_tags': vocab.n_pos_tags,
             'n_dep_tags': vocab.n_dep_tags,

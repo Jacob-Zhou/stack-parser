@@ -13,8 +13,7 @@ Sentence = namedtuple(typename='Sentence',
 
 
 class Corpus(object):
-    bos = '<BOS>'
-    eos = '<EOS>'
+    root = '<ROOT>'
 
     def __init__(self, sentences):
         super(Corpus, self).__init__()
@@ -38,13 +37,13 @@ class Corpus(object):
     def words(self):
         if not self.sentences[0].FORM:
             raise AttributeError
-        return [[self.bos] + list(sentence.FORM) for sentence in self]
+        return [[self.root] + list(sentence.FORM) for sentence in self]
 
     @property
     def tags(self):
         if not self.sentences[0].POS:
             raise AttributeError
-        return [[self.bos] + list(sentence.POS) for sentence in self]
+        return [[self.root] + list(sentence.POS) for sentence in self]
 
     @property
     def heads(self):
@@ -56,7 +55,7 @@ class Corpus(object):
     def rels(self):
         if not self.sentences[0].DEPREL:
             raise AttributeError
-        return [[self.bos] + list(sentence.DEPREL) for sentence in self]
+        return [[self.root] + list(sentence.DEPREL) for sentence in self]
 
     @tags.setter
     def tags(self, sequences):
