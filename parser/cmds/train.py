@@ -104,14 +104,10 @@ class Train(object):
         dep_train_loader = batchify(dep_trainset,
                                     config.batch_size//config.update_steps,
                                     True)
-        pos_dev_loader = batchify(pos_devset,
-                                  config.pos_batch_size)
-        dep_dev_loader = batchify(dep_devset,
-                                  config.batch_size)
-        pos_test_loader = batchify(pos_testset,
-                                   config.pos_batch_size)
-        dep_test_loader = batchify(dep_testset,
-                                   config.batch_size)
+        pos_dev_loader = batchify(pos_devset, config.pos_batch_size)
+        dep_dev_loader = batchify(dep_devset, config.batch_size)
+        pos_test_loader = batchify(pos_testset, config.pos_batch_size)
+        dep_test_loader = batchify(dep_testset, config.batch_size)
 
         print(vocab)
         print(f"{'pos_train:':10} {len(pos_trainset):7} sentences in total, "
