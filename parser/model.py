@@ -31,11 +31,6 @@ class Model(object):
             loss = self.parser.criterion(s_tag[mask], pos_tags[mask])
             loss = loss / self.config.update_steps
             loss.backward()
-            if (i + 1) % self.config.update_steps == 0:
-                nn.utils.clip_grad_norm_(self.parser.parameters(),
-                                         self.config.clip)
-                self.optimizer.step()
-                self.optimizer.zero_grad()
 
             mask = words.ne(self.vocab.pad_index)
             # ignore the first token of each sentence
