@@ -102,10 +102,11 @@ class BiaffineParser(nn.Module):
         inverse_indices = indices.argsort()
         x_tag = pack_padded_sequence(x[indices], sorted_lens, True)
         if self.weight:
-            x_tag = [pad_packed_sequence(i, True)[0] for i in self.lstm(x_tag)]
+            x_tag = [pad_packed_sequence(i, True)[0]
+                     for i in self.tag_lstm(x_tag)]
             x_tag = self.tag_mix(x_tag)
         else:
-            x_tag = pad_packed_sequence(self.lstm(x_tag)[-1], True)[0]
+            x_tag = pad_packed_sequence(self.tag_lstm(x_tag)[-1], True)[0]
         x_tag = self.lstm_dropout(x_tag)[inverse_indices]
         x_tag = self.mlp_tag(x_tag)
 
@@ -113,12 +114,12 @@ class BiaffineParser(nn.Module):
             return self.ffn_pos_tag(x_tag)
 
         x_dep = pack_padded_sequence(x[indices], sorted_lens, True)
-        x_dep = self.dep_lstm(x_dep)[-1]
         if self.weight:
-            x_dep = [pad_packed_sequence(i, True)[0] for i in self.lstm(x_dep)]
+            x_dep = [pad_packed_sequence(i, True)[0]
+                     for i in self.dep_lstm(x_dep)]
             x_dep = self.dep_mix(x_dep)
         else:
-            x_dep = pad_packed_sequence(self.lstm(x_dep)[-1], True)[0]
+            x_dep = pad_packed_sequence(self.dep_lstm(x_dep)[-1], True)[0]
         x_dep = self.lstm_dropout(x_dep)[inverse_indices]
 
         # apply MLPs to the BiLSTM output states
