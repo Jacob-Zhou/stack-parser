@@ -9,7 +9,7 @@ class Embedding(object):
         super(Embedding, self).__init__()
 
         self.tokens = tokens
-        self.vectors = vectors
+        self.vectors = torch.tensor(vectors)
         self.pretrained = {w: v for w, v in zip(tokens, vectors)}
         self.unk = unk
 
@@ -24,7 +24,14 @@ class Embedding(object):
 
     @property
     def dim(self):
-        return len(self.vectors[0])
+        return self.vectors.size(1)
+
+    @property
+    def unk_index(self):
+        if self.unk is not None:
+            return self.tokens.index(self.unk)
+        else:
+            raise AttributeError
 
     @classmethod
     def load(cls, fname, unk=None):

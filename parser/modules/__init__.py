@@ -8,6 +8,5 @@ from .highway import Highway
 from .mlp import MLP
 from .scalar_mix import ScalarMix
 
-
 __all__ = ['CHAR_LSTM', 'MLP', 'Biaffine', 'BiLSTM', 'Highway',
            'IndependentDropout', 'ScalarMix', 'SharedDropout']
