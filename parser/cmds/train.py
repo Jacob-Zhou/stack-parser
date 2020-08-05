@@ -46,7 +46,9 @@ class Train(object):
         return subparser
 
     def __call__(self, config):
-        if config.preprocess:
+        if not os.path.exists(config.file):
+            os.mkdir(config.file)
+        if config.preprocess or not os.path.exists(config.vocab):
             print("Preprocess the corpus")
             pos_train = Corpus.load(config.fptrain, [1, 4], config.pos)
             dep_train = Corpus.load(config.ftrain)
@@ -77,17 +79,16 @@ class Train(object):
             torch.save(dep_devset, os.path.join(config.file, 'dep_devset'))
             torch.save(pos_testset, os.path.join(config.file, 'pos_testset'))
             torch.save(dep_testset, os.path.join(config.file, 'dep_testset'))
-            return
-
-        print("Load the vocab")
-        vocab = torch.load(config.vocab)
-        print("Load the datasets")
-        pos_trainset = torch.load(os.path.join(config.file, 'pos_trainset'))
-        dep_trainset = torch.load(os.path.join(config.file, 'dep_trainset'))
-        pos_devset = torch.load(os.path.join(config.file, 'pos_devset'))
-        dep_devset = torch.load(os.path.join(config.file, 'dep_devset'))
-        pos_testset = torch.load(os.path.join(config.file, 'pos_testset'))
-        dep_testset = torch.load(os.path.join(config.file, 'dep_testset'))
+        else:
+            print("Load the vocab")
+            vocab = torch.load(config.vocab)
+            print("Load the datasets")
+            pos_trainset = torch.load(os.path.join(config.file, 'pos_trainset'))
+            dep_trainset = torch.load(os.path.join(config.file, 'dep_trainset'))
+            pos_devset = torch.load(os.path.join(config.file, 'pos_devset'))
+            dep_devset = torch.load(os.path.join(config.file, 'dep_devset'))
+            pos_testset = torch.load(os.path.join(config.file, 'pos_testset'))
+            dep_testset = torch.load(os.path.join(config.file, 'dep_testset'))
         config.update({
             'n_words': vocab.n_init,
             'n_chars': vocab.n_chars,

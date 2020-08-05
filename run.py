@@ -38,10 +38,15 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     print(f"Set the max num of threads to {args.threads}")
-    print(f"Set the seed for generating random numbers to {args.seed}")
+    if args.seed != -1:
+        print(f"Set the seed for generating random numbers to {args.seed}")
+        torch.manual_seed(args.seed)
+    else:
+        seed = torch.initial_seed() % 10000000
+        torch.manual_seed(seed)
+        print(f"the seed of random numbers generating {seed}")
     print(f"Set the device with ID {args.device} visible")
     torch.set_num_threads(args.threads)
-    torch.manual_seed(args.seed)
     os.environ['CUDA_VISIBLE_DEVICES'] = args.device
     args.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
