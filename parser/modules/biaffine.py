@@ -5,9 +5,31 @@ import torch.nn as nn
 
 
 class Biaffine(nn.Module):
+    """
+    Biaffine layer for first-order scoring.
+
+    This function has a tensor of weights `W` and bias terms if needed.
+    The score `s(x, y)` of the vector pair `(x, y)` is computed as `x^T W y`,
+    in which `x` and `y` can be concatenated with bias terms.
+
+    References:
+        - Timothy Dozat and Christopher D. Manning (ICLR'17)
+          Deep Biaffine Attention for Neural Dependency Parsing
+          https://openreview.net/pdf?id=Hk95PK9le/
+
+    Args:
+        n_in (int):
+            The dimension of the input feature.
+        n_out (int):
+            The number of output channels.
+        bias_x (bool):
+            If True, add a bias term for tensor x. Default: False.
+        bias_y (bool):
+            If True, add a bias term for tensor y. Default: False.
+    """
 
     def __init__(self, n_in, n_out=1, bias_x=True, bias_y=True):
-        super(Biaffine, self).__init__()
+        super().__init__()
 
         self.n_in = n_in
         self.n_out = n_out
@@ -31,16 +53,22 @@ class Biaffine(nn.Module):
         nn.init.zeros_(self.weight)
 
     def forward(self, x, y):
+        """
+        Args:
+            x (torch.Tensor): [batch_size, seq_len, n_in]
+            y (torch.Tensor): [batch_size, seq_len, n_in]
+
+        Returns:
+            s (torch.Tensor): [batch_size, n_out, seq_len, seq_len]
+                If n_out is 1, the dimension of n_out will be squeezed automatically.
+        """
+
         if self.bias_x:
-            x = torch.cat([x, x.new_ones(x.shape[:-1]).unsqueeze(-1)], -1)
+            x = torch.cat((x, torch.ones_like(x[..., :1])), -1)
         if self.bias_y:
-            y = torch.cat([y, y.new_ones(y.shape[:-1]).unsqueeze(-1)], -1)
-        # [batch_size, 1, seq_len, d]
-        x = x.unsqueeze(1)
-        # [batch_size, 1, seq_len, d]
-        y = y.unsqueeze(1)
+            y = torch.cat((y, torch.ones_like(y[..., :1])), -1)
         # [batch_size, n_out, seq_len, seq_len]
-        s = x @ self.weight @ y.transpose(-1, -2)
+        s = torch.einsum('bxi,oij,byj->boxy', x, self.weight, y)
         # remove dim 1 if n_out == 1
         s = s.squeeze(1)
 
