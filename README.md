@@ -1,15 +1,6 @@
-# Biaffine Parser
+# Stack Parser (Stack)
 
-[![Travis](https://img.shields.io/travis/zysite/biaffine-parser.svg)](https://travis-ci.org/zysite/biaffine-parser)
-[![LICENSE](https://img.shields.io/github/license/zysite/biaffine-parser.svg)](https://github.com/zysite/biaffine-parser/blob/master/LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/zysite/biaffine-parser.svg)](https://github.com/zysite/biaffine-parser/stargazers)		
-[![GitHub forks](https://img.shields.io/github/forks/zysite/biaffine-parser.svg)](https://github.com/zysite/biaffine-parser/network/members)
-
-An implementation of "Deep Biaffine Attention for Neural Dependency Parsing".
-
-Details and [hyperparameter choices](#Hyperparameters) are almost identical to those described in the paper, except for some training settings. Also, we do not provide a decoding algorithm to ensure well-formedness, and this does not seriously affect the results.
-
-Another version of the implementation is available on [char](https://github.com/zysite/biaffine-parser/tree/char) branch, which replaces the tag embedding with char lstm and achieves better performance.
+The implementation of "Is POS Tagging Necessary or Even Helpful for Neural Dependency Parsing?".
 
 ## Requirements
 
@@ -20,32 +11,11 @@ pytorch == 1.0.0
 
 ## Datasets
 
-The model is evaluated on the Stanford Dependency conversion ([v3.3.0](https://nlp.stanford.edu/software/stanford-parser-full-2013-11-12.zip)) of the English Penn Treebank with POS tags predicted by [Stanford POS tagger](https://nlp.stanford.edu/software/stanford-postagger-full-2018-10-16.zip).
-
-For all datasets, we follow the conventional data splits:
-
-* Train: 02-21 (39,832 sentences)
-* Dev: 22 (1,700 sentences)
-* Test: 23 (2,416 sentences)
+TODO
 
 ## Performance
 
-|               |  UAS  |  LAS  |
-| ------------- | :---: | :---: |
-| tag embedding | 95.94 | 94.26 |
-| char lstm     | 96.10 | 94.50 |
-
-Note that punctuation is excluded in all evaluation metrics. 
-
-Aside from using consistent hyperparameters, there are some keypoints that significantly affect the performance:
-
-- Dividing the pretrained embedding by its standard-deviation
-- Applying the same dropout mask at every recurrent timestep
-- Jointly dropping the words and tags
-
-For the above reasons, we may have to give up some native modules in pytorch (e.g., `LSTM` and `Dropout`), and use self-implemented ones instead.
-
-As shown above, our results, especially on char lstm version, have outperformed the [offical implementation](https://github.com/tdozat/Parser-v1) (95.74 and 94.08).
+TODO
 
 ## Usage
 
@@ -142,7 +112,7 @@ optional arguments:
 | Param         | Description                             |                                 Value                                  |
 | :------------ | :-------------------------------------- | :--------------------------------------------------------------------: |
 | n_embed       | dimension of word embedding             |                                  100                                   |
-| n_tag_embed   | dimension of tag embedding              |                                  100                                   |
+| n_char_embed  | dimension of char embedding             |                                  50                                   |
 | embed_dropout | dropout ratio of embeddings             |                                  0.33                                  |
 | n_lstm_hidden | dimension of lstm hidden state          |                                  400                                   |
 | n_lstm_layers | number of lstm layers                   |                                   3                                    |
@@ -160,5 +130,29 @@ optional arguments:
 
 ## References
 
-* [Deep Biaffine Attention for Neural Dependency Parsing](https://arxiv.org/abs/1611.01734)
- 
+* Houquan Zhou, Yu Zhang, Zhenghua Li, Min Zhang [Is POS Tagging Necessary or Even Helpful for Neural Dependency Parsing?](https://arxiv.org/abs/1611.01734)
+
+```txt
+@inproceedings{zhou2020is,
+  author    = {Houquan Zhou and
+               Yu Zhang and
+               Zhenghua Li and
+               Min Zhang},
+  editor    = {Xiaodan Zhu and
+               Min Zhang and
+               Yu Hong and
+               Ruifang He},
+  title     = {Is {POS} Tagging Necessary or Even Helpful for Neural Dependency Parsing?},
+  booktitle = {Natural Language Processing and Chinese Computing - 9th {CCF} International Conference, {NLPCC} 2020, Zhengzhou, China, October 14-18, 2020, Proceedings, Part {I}},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {12430},
+  pages     = {179--191},
+  publisher = {Springer},
+  year      = {2020},
+  url       = {https://doi.org/10.1007/978-3-030-60450-9\_15},
+  doi       = {10.1007/978-3-030-60450-9\_15},
+  timestamp = {Thu, 08 Oct 2020 12:56:06 +0200},
+  biburl    = {https://dblp.org/rec/conf/nlpcc/ZhouZLZ20.bib},
+  bibsource = {dblp computer science bibliography, https://dblp.org}
+}
+```
