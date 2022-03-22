@@ -130,7 +130,7 @@ optional arguments:
 
 ## References
 
-* Houquan Zhou, Yu Zhang, Zhenghua Li, Min Zhang [Is POS Tagging Necessary or Even Helpful for Neural Dependency Parsing?](https://arxiv.org/abs/1611.01734)
+* Houquan Zhou, Yu Zhang, Zhenghua Li, Min Zhang [Is POS Tagging Necessary or Even Helpful for Neural Dependency Parsing?](https://arxiv.org/abs/2003.03204)
 
 ```txt
 @inproceedings{zhou2020is,
